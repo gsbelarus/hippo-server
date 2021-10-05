@@ -30,9 +30,8 @@ export interface Good {
   groupcode: string;
   moq:number;
  }
- 
 
-
-
-
-
+export interface DataObject<K> {
+  name: string;
+  data: K[];
+};
