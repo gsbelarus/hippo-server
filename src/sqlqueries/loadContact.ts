@@ -1,6 +1,6 @@
 import { Contact } from "../types";
 
-export const loadContact = async (data: Contact [], attachment: any) => {
+export const loadContact = async (data: Contact[], attachment: any) => {
 	const transaction = await attachment.startTransaction();
 		
 	const statement1 = await attachment.prepare(transaction, ` EXECUTE BLOCK (CODE VARCHAR(50) = :CODE, NAME VARCHAR(200) = :NAME, ADDRESS VARCHAR(140) = :ADDRESS, PHONE VARCHAR(80) = :PHONE, EMAIL VARCHAR(255) = :EMAIL, GLN VARCHAR(13) = :GLN, TAXID VARCHAR(9) = :TAXID)
