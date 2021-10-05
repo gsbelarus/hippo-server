@@ -1,4 +1,3 @@
-/* eslint-disable  no-explicit-any */
 import express, { response } from "express";
 import { Request, Response, NextFunction } from 'express';
 import { createNativeClient, getDefaultLibraryFilename } from 'node-firebird-driver-native';
@@ -6,7 +5,7 @@ import bodyParser from 'body-parser';
 import { json } from "stream/consumers";
 import { Goodgroup, Value, Contact, Good } from "./types";
 import { loadContact, loadValue, loadGood, loadGoodgroup } from "./sqlqueries";
-import { dbOptions } from "./config/environments/firebird";
+import { dbOptions } from "./config/firebird";
 
 export interface DataObject<K> {
   name: string;
