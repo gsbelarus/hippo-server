@@ -45,28 +45,42 @@ app.get("/", async (req, res) => {
   res.send("We have done successfull connection to a database");
 });
 
-app.post("/values", async (req, res) => {
-  if (!isDataObject(req.body)) {
-    //TODO
-    res.status(422).send('Unprocessable Entity'); 
-  }
-
-  const { name, data } = req.body as DataObject<Value>;
-  try {
-    const attachment = await attach();
-    try {
-      if (name === "value" && data.length) {
-        await loadValue(data, attachment);
+const appPost = (endPoint: string, validator: (dataObj: any) => boolean, func: (dataObj: any, attachment: Attachment) => Promise<void>) => {
+  app.post(endPoint, async (req: Request, res: Response) => {
+    const reqBodyObj = req.body;
+    if (validator(reqBodyObj)) {
+      try {
+        const attachment = await attach();
+        try {
+          await func(reqBodyObj.data, attachment);
+          res.statusCode = 200;
+          res.json({ result: 'OK', status: 200 });
+        } finally {
+          await attachment.disconnect();
+        }
+      } catch (err) {
+        console.error(err);
       }
-      res.statusCode = 200;
-      res.json({ result: 'OK', status: 200 });
-    } finally {
-      await attachment.disconnect();
+    } else {
+      res.status(422).send('Unprocessable Entity');
     }
-  } catch (err) {
-    console.error(err);
-  }
-});
+  } );
+};
+
+const makeDataValidator = (itemValidator: any) => (reqBodyObj: any) =>
+  typeof reqBodyObj === 'object'
+  &&
+  reqBodyObj.name === 'value'
+  &&
+  Array.isArray(reqBodyObj.data)
+  &&
+  !!reqBodyObj.data.length
+  &&
+  itemValidator(reqBodyObj.data[0]);
+
+const isValueData = (obj: any): obj is Value => typeof obj === 'object' && typeof obj.name === 'string' && obj.name && typeof obj.code === 'string' && obj.code;
+
+appPost('/values', makeDataValidator(isValueData), loadValue);
 
 app.post("/contacts", async (req, res) => {
   const { name, data } = req.body as DataObject<Contact>;
@@ -91,7 +105,7 @@ app.post("/goods", async (req, res) => {
     res.status(422).send('Something broke!');
   }
   const { name, data } = req.body as DataObject<Good>;
-  
+
   // if (data.length = 0) {
   //   res.status(422).send('Something broke!');
   // }
@@ -99,7 +113,7 @@ app.post("/goods", async (req, res) => {
   // if (!isGoodData(data[0])) {
   //   res.status(422).send('Something broke!');
   // }
- 
+
   try {
     const attachment = await client.connect(
       "192.168.0.69/3054:k:/Bases/Gippo/FABRIKA.FDB",
@@ -186,11 +200,7 @@ function data(data: any, attachment: Attachment) {
 }
 
 const isDataObject = (obj: any): obj is DataObject => {
-  return typeof obj === 'object' && 'name' in obj && 'data' in obj ;
-};
-
-const isValueData = (obj: any): obj is Value => {
-  return typeof obj === 'object' && 'name' in obj && 'code' in obj ;
+  return typeof obj === 'object' && obj.name && Array.isArray(obj.data);
 };
 
 const isGoodData = (obj: any): obj is Good => {
