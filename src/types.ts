@@ -1,3 +1,8 @@
+export interface DataObject<K = string> {
+  name: string;
+  data: K[];
+}
+
 export interface Contact {
   name: string;
   code: string;
@@ -21,17 +26,33 @@ export interface Goodgroup {
 }
 export interface Good {
   code: string;
-  rate:number;
+  rate: number;
   name: string;
   weight: number;
   disabled: number;
   barcode: string;
   valuecode: string;
   groupcode: string;
-  moq:number;
- }
+  moq: number;
+}
 
-export interface DataObject<K> {
-  name: string;
-  data: K[];
-};
+
+export interface Contract {
+  code:string;
+  number: number;
+  contactcode: string;
+  datebegin: Date;
+  dateend: Date;
+}
+
+export interface Protocol {
+  code:string;
+  number: number;
+  contractcode: string;
+  contactcode:string;
+  datebegin: Date;
+  dateend: Date;
+  goodcode: string;
+  price:number;
+  endprice: number;
+}

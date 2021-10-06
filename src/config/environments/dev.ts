@@ -20,11 +20,11 @@ export default {
    */
    PORT: 8000,
 
-   /**
+   /**192.168.0.69
     * Firebird database host (localhost or IP adress)
     */
  
-   FIREBIRD_HOST: '192.168.0.69',
+   FIREBIRD_HOST: 'vkl',
  
    /**
     * Firebird database Port (mainly 3050)

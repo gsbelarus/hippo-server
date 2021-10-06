@@ -1,9 +1,8 @@
+import { Attachment } from "node-firebird-driver";
+import { execPath } from "process";
 import { Contact } from "../types";
 
-export const loadContact = async (data: Contact[], attachment: any) => {
-	const transaction = await attachment.startTransaction();
-		
-	const statement1 = await attachment.prepare(transaction, ` EXECUTE BLOCK (CODE VARCHAR(50) = :CODE, NAME VARCHAR(200) = :NAME, ADDRESS VARCHAR(140) = :ADDRESS, PHONE VARCHAR(80) = :PHONE, EMAIL VARCHAR(255) = :EMAIL, GLN VARCHAR(13) = :GLN, TAXID VARCHAR(9) = :TAXID)
+const eb = ` EXECUTE BLOCK (CODE VARCHAR(50) = :CODE, NAME VARCHAR(200) = :NAME, ADDRESS VARCHAR(140) = :ADDRESS, PHONE VARCHAR(80) = :PHONE, EMAIL VARCHAR(255) = :EMAIL, GLN VARCHAR(13) = :GLN, TAXID VARCHAR(9) = :TAXID)
   AS
   DECLARE variable ID INTEGER;
   DECLARE variable PARENT INTEGER;
@@ -37,22 +36,29 @@ export const loadContact = async (data: Contact[], attachment: any) => {
       UPDATE GD_COMPANY SET FULLNAME = :NAME WHERE CONTACTKEY = :ID;
       UPDATE GD_COMPANYCODE SET TAXID = :TAXID WHERE COMPANYKEY = :ID;
     END
-  END`);
+  END`;
 
-    for (const item of data) {
-			// console.log("item=", item.name);
-			const params = [
-       item.code,
-       item.name,
-       item.address || '',
-       item.phone || '',
-       item.email || '',
-       item.gln || '',
-       item.taxid || '',
-				];
-
-			await statement1.execute(transaction, params);
-		}			
-
-	await transaction.commit();
-}
+export const loadContact = async (data: Contact[], attachment: Attachment) => {
+  const tr = await attachment.startTransaction();
+  try {
+    try {
+      const st = await attachment.prepare(tr, eb);
+      for (const i of data) {
+        await st.execute(tr, [
+          i.code,
+          i.name,
+          i.address,
+          i.phone,
+          i.email,
+          i.gln,
+          i.taxid,
+        ]);
+      }
+    } catch (err) {
+      console.error(err);
+      await tr.rollback();
+    }
+  } finally {
+    await tr.commit();
+  }
+};

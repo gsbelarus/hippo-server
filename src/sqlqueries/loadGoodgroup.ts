@@ -1,10 +1,9 @@
+import { Attachment } from "node-firebird-driver";
+import { execPath } from "process";
 import { Goodgroup } from "../types";
 
-export const loadGoodgroup = async (data: Goodgroup[], attachment: any) => {
-	const transaction = await attachment.startTransaction();
-		
-	const statement1 = await attachment.prepare(transaction, ` /* товарные группы */
-    EXECUTE BLOCK (CODE VARCHAR(50) = :CODE, NAME VARCHAR(80) = :NAME, PARENTCODE VARCHAR(50) = :PARENTCODE)
+const eb = ` /* товарные группы */
+    EXECUTE BLOCK (CODE VARCHAR(50) = ?, NAME VARCHAR(80) = ?, PARENTCODE VARCHAR(50) = ?)
     AS
     DECLARE variable ID INTEGER;
     DECLARE variable PARENT INTEGER;
@@ -43,19 +42,25 @@ export const loadGoodgroup = async (data: Goodgroup[], attachment: any) => {
       BEGIN
         UPDATE GD_GOODGROUP SET NAME = :NAME, PARENT = :PARENT WHERE ID = :ID;
       END
-    END`);
-
-    for (const item of data) {
-			// console.log("item=", item.name);
-			const params = [
-        item.code,
-        item.name,
-        item.parentcode,
-				];
-
-			await statement1.execute(transaction, params);
-		}			
-
-	await transaction.commit();
+    END`;
+export async function loadGoodgroup(data: Goodgroup[], attachment: Attachment) {
+  const tr = await attachment.startTransaction();
+  try {
+    try {
+      console.log('1');
+      const st = await attachment.prepare(tr, eb);
+      console.log('2');
+      for (const i of data) {
+        await st.execute(tr, [i.code, i.name, i.parentcode]);
+        console.log('item', i);
+      }
+    } catch (err) {
+      console.log('err');
+      console.error(err);
+      await tr.rollback();
+    }
+  } finally {
+    console.log('3');
+    await tr.commit();
+  }
 }
-

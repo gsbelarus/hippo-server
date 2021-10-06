@@ -2,8 +2,7 @@ import { Attachment } from "node-firebird-driver";
 import { execPath } from "process";
 import { Value } from "../types";
 
-const eb =
-`/* единицы измерения */
+const eb = `/* единицы измерения */
 EXECUTE BLOCK (CODE VARCHAR(50) = ?, NAME VARCHAR(50) = ?, SHORTNAME VARCHAR(50) = ?)
 AS
 DECLARE variable ID INTEGER;
@@ -33,18 +32,18 @@ BEGIN
 END`;
 
 export const loadValue = async (data: Value[], attachment: Attachment) => {
-	const tr = await attachment.startTransaction();
+  const tr = await attachment.startTransaction();
   try {
     try {
       const st = await attachment.prepare(tr, eb);
       for (const i of data) {
         await st.execute(tr, [i.code, i.name, i.shortName]);
       }
-    } catch(err) {
+    } catch (err) {
       console.error(err);
       await tr.rollback();
     }
   } finally {
-		await tr.commit();
+    await tr.commit();
   }
 };
