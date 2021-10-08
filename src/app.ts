@@ -115,11 +115,11 @@ appPost(
 );
 
 const isContactData = (obj: any): obj is Contact => true;
-  //typeof obj === "object" &&
-  //typeof obj.name === "string" &&
-  //obj.name &&
-  //typeof obj.code === "string" &&
-  //obj.code;
+  typeof obj === "object" &&
+  typeof obj.name === "string" &&
+  obj.name &&
+  typeof obj.code === "string" &&
+  obj.code;
 
 appPost("/contacts", makeDataValidator(isContactData, "contact"), loadContact);
 
