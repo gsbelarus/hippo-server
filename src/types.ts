@@ -4,14 +4,14 @@ export interface DataObject<K = string> {
 }
 
 export interface Contact {
-  name: string;
   code: string;
+  name: string;
   address: string;
   phone: string;
-  taxid: string;
-  gln: string;
-  edi: string;
   email: string;
+  gln: string;
+  taxid: string;
+ 
 }
 
 export interface Value {
@@ -39,7 +39,7 @@ export interface Good {
 
 export interface Contract {
   code:string;
-  number: number;
+  number: string;
   contactcode: string;
   datebegin: Date;
   dateend: Date;
@@ -55,4 +55,14 @@ export interface Protocol {
   goodcode: string;
   price:number;
   endprice: number;
+}
+
+export interface Claim {
+  code:string;
+  number: number;
+  docdate: Date;
+  orderdate:Date;
+  stringnumber: number;
+  goodcode: string;
+  quant: number;
 }

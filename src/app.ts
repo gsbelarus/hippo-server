@@ -15,6 +15,7 @@ import {
   DataObject,
   Contract,
   Protocol,
+  Claim,
 } from "./types";
 import {
   loadContact,
@@ -25,27 +26,33 @@ import {
   loadProtocol,
 } from "./sqlqueries";
 import { dbOptions } from "./config/firebird";
+import { loadClaim } from "./sqlqueries/loadClaim";
 
 const client = createNativeClient(getDefaultLibraryFilename());
 
-const attach = () => client.connect(
-  `${dbOptions.server?.host}/${dbOptions.server?.port}:${dbOptions.path}`,
-  {
-    username: dbOptions.username,
-    password: dbOptions.password,
-  }
-);
+const attach = () =>
+  client.connect(
+    `${dbOptions.server?.host}/${dbOptions.server?.port}:${dbOptions.path}`,
+    {
+      username: dbOptions.username,
+      password: dbOptions.password,
+    }
+  );
 
 const app = express();
 const PORT = 8000;
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ limit: "10mb", extended: true }));
+app.use(express.json({limit: "10mb"}));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 app.get("/", async (req, res) => {
   res.send("We have done successfull connection to a database");
 });
 
-const appPost = (endPoint: string, validator: (dataObj: any) => boolean, func: (dataObj: any, attachment: Attachment) => Promise<void>) => {
+const appPost = (
+  endPoint: string,
+  validator: (dataObj: any) => boolean,
+  func: (dataObj: any, attachment: Attachment) => Promise<void>
+) => {
   app.post(endPoint, async (req: Request, res: Response) => {
     const reqBodyObj = req.body;
     if (validator(reqBodyObj)) {
@@ -54,7 +61,7 @@ const appPost = (endPoint: string, validator: (dataObj: any) => boolean, func: (
         try {
           await func(reqBodyObj.data, attachment);
           res.statusCode = 200;
-          res.json({ result: 'OK', status: 200 });
+          res.json({ result: "OK", status: 200 });
         } finally {
           await attachment.disconnect();
         }
@@ -62,134 +69,95 @@ const appPost = (endPoint: string, validator: (dataObj: any) => boolean, func: (
         console.error(err);
       }
     } else {
-      res.status(422).send('Unprocessable Entity');
+      res.status(422).send("Unprocessable Entity");
     }
-  } );
+  });
 };
 
-const makeDataValidator = (itemValidator: any) => (reqBodyObj: any) =>
-  typeof reqBodyObj === 'object'
-  &&
-  reqBodyObj.name === 'value'
-  &&
-  Array.isArray(reqBodyObj.data)
-  &&
-  !!reqBodyObj.data.length
-  &&
-  itemValidator(reqBodyObj.data[0]);
+const makeDataValidator =
+  (itemValidator: any, name: string) => (reqBodyObj: any) =>
+    typeof reqBodyObj === "object" &&
+    reqBodyObj.name === name &&
+    Array.isArray(reqBodyObj.data) &&
+    !!reqBodyObj.data.length &&
+    itemValidator(reqBodyObj.data[0]);
 
-const isValueData = (obj: any): obj is Value => typeof obj === 'object' && typeof obj.name === 'string' && obj.name && typeof obj.code === 'string' && obj.code;
+const isValueData = (obj: any): obj is Value =>
+  typeof obj === "object" &&
+  typeof obj.name === "string" &&
+  obj.name &&
+  typeof obj.code === "string" &&
+  obj.code;
 
-appPost('/values', makeDataValidator(isValueData), loadValue);
+appPost("/values", makeDataValidator(isValueData, "value"), loadValue);
 
-app.post("/contacts", async (req, res) => {
-  const { name, data } = req.body as DataObject<Contact>;
-  try {
-    const attachment = await attach();
-    try {
-      if (name === "contact" && data.length) {
-        await loadContact(data, attachment);
-      }
-      res.statusCode = 200;
-    } finally {
-      await attachment.disconnect();
-    }
-  } catch (err) {
-    console.error(err);
-  }
-});
+const isContractData = (obj: any): obj is Contract => true;
+//typeof obj === 'object'
+//&& typeof obj.number === 'string' && obj.number
+//&& typeof obj.code === 'string' && obj.code
+//&& typeof obj.contactcode === 'string' && obj.contactcode;
+//&& typeof obj.datebegin === 'Data' && obj.datebegin;
 
-app.post("/goods", async (req, res) => {
-  if (!isDataObject(req.body)) {
-    //TODO
-    res.status(422).send('Something broke!');
-  }
-  const { name, data } = req.body as DataObject<Good>;
+appPost("/contracts", makeDataValidator(isContractData, "contract"), loadContract);
 
-  // if (data.length = 0) {
-  //   res.status(422).send('Something broke!');
-  // }
+const isProtocolData = (obj: any): obj is Protocol => true;
+//typeof obj === 'object'
+//&& typeof obj.code === 'string' && obj.code;
+//&& typeof obj.number === 'number' && obj.number
+//&& typeof obj.contactcode === 'string' && obj.contactcode
+//&& typeof obj.goodcode === 'string' && obj.goodcode
+//&& typeof obj.price === 'number' && obj.price;
 
-  // if (!isGoodData(data[0])) {
-  //   res.status(422).send('Something broke!');
-  // }
+appPost(
+  "/protocols",
+  makeDataValidator(isProtocolData, "protocol"),
+  loadProtocol
+);
 
-  try {
-    const attachment = await client.connect(
-      "192.168.0.69/3054:k:/Bases/Gippo/FABRIKA.FDB",
-      {
-        username: dbOptions.username,
-        password: dbOptions.password,
-      }
-    );
-    try {
-      if (name === "good" && data.length) {
-        await loadGood(data, attachment);
-      }
-      res.statusCode = 200;
-      res.json({result: 'OK'});
-    } finally {
-      await attachment.disconnect();
-    }
-  } catch (err) {
-    console.error(err);
-  }
-});
+const isContactData = (obj: any): obj is Contact => true;
+  //typeof obj === "object" &&
+  //typeof obj.name === "string" &&
+  //obj.name &&
+  //typeof obj.code === "string" &&
+  //obj.code;
 
-app.post("/goodgroups", async (req, res) => {
-  const { name, data } = req.body as DataObject<Goodgroup>;
-  try {
-    const attachment = await client.connect(
-      "vkl/3054:k:/Bases/Gippo/FABRIKA.FDB",
-      { username: dbOptions.username, password: dbOptions.password }
-    );
-    try {
-      if (name === "goodgroup" && data.length) {
-        await loadGoodgroup(data, attachment);
-      }
-      res.statusCode = 200;
-      // res.json();
-    } finally {
-      await attachment.disconnect();
-    }
-  } catch (err) {
-    console.error(err);
-  }
-});
+appPost("/contacts", makeDataValidator(isContactData, "contact"), loadContact);
 
-app.post("/contracts", async (req, res) => {
-  const { name, data } = req.body as DataObject<Contract>;
-  try {
-    const attachment = await attach();
-    try {
-      if (name === "contract" && data.length) {
-        await loadContract(data, attachment);
-      }
-      res.statusCode = 200;
-    } finally {
-      await attachment.disconnect();
-    }
-  } catch (err) {
-    console.error(err);
-  }
-});
+const isGoodData = (obj: any): obj is Good =>
+  typeof obj === "object" &&
+  typeof obj.name === "string" &&
+  obj.name &&
+  typeof obj.code === "string" &&
+  obj.code &&
+  typeof obj.groupcode === "string" &&
+  obj.groupcode;
 
-app.post("/protocols", async (req, res) => {
-  const { name, data } = req.body as DataObject<Protocol>;
-  try {
-    const attachment = await attach();
-    try {
-      if (name === "protocol" && data.length) {
-        await loadProtocol(data, attachment);
-      }
-      res.statusCode = 200;
-    } finally {
-      await attachment.disconnect();
-    }
-  } catch (err) {
-    console.error(err);
-  }
-});
+appPost("/goods", makeDataValidator(isGoodData, "good"), loadGood);
+
+const isGoodgroupData = (obj: any): obj is Goodgroup => 
+  typeof obj === "object" &&
+  typeof obj.name === "string" &&
+  obj.name &&
+  typeof obj.code === "string" &&
+  obj.code;
+
+
+appPost(
+  "/goodgroups",
+  makeDataValidator(isGoodgroup, "goodgroup"),
+  loadGoodgroup
+);
+const isClaim = (obj: any): obj is Claim => 
+  typeof obj === "object"
+  && typeof obj.code === "string" && obj.code
+  && typeof obj.number === "number" && obj.number;
+
+
+
+appPost("/claims",
+  makeDataValidator(isClaim, "claim"),
+  loadClaim
+);
 
 app.listen(PORT, () => {
   console.log(`Server now is running on port 8000`);
@@ -200,9 +168,20 @@ function data(data: any, attachment: Attachment) {
 }
 
 const isDataObject = (obj: any): obj is DataObject => {
-  return typeof obj === 'object' && obj.name && Array.isArray(obj.data);
+  return typeof obj === "object" && obj.name && Array.isArray(obj.data);
 };
 
-const isGoodData = (obj: any): obj is Good => {
-  return typeof obj === 'object' && 'name' in obj && 'code' in obj ;
-};
+
+function isGoodgroup(isGoodgroup: any, arg1: string): (dataObj: any) => boolean {
+  throw new Error("Function not implemented.");
+}
+// function isGoodgroup(
+  // isGoodgroup: any,
+  // arg1: string
+// ): (dataObj: any) => boolean {
+  // throw new Error("Function not implemented.");
+// }
+//const isGoodData = (obj: any): obj is Good => {
+//  return typeof obj === 'object' && 'name' in obj && 'code' in obj ;
+//};
+

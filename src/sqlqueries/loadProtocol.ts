@@ -1,9 +1,9 @@
 import { Attachment } from "node-firebird-driver";
 import { Protocol } from "../types";
-import { execPath } from "process";
+//import { execPath } from "process";
 
 const eb = `/* protocol*/
-EXECUTE BLOCK (CODE VARCHAR(50) = :CODE, NUMBER VARCHAR(50) = :NUMBER, CONTRACTCODE VARCHAR(50) = :CONTRACTCODE, CONTACTCODE VARCHAR(50) = :CONTACTCODE, DATEBEGIN DATE = :DATEBEGIN, DATEEND DATE = :DATEEND, GOODCODE VARCHAR(50) = :GOODCODE, PRICE DOUBLE PRECISION = :PRICE, ENDPRICE DOUBLE PRECISION = :ENDPRICE)
+EXECUTE BLOCK (CODE VARCHAR(50) = ?, NUMBER VARCHAR(50) = ?, CONTRACTCODE VARCHAR(50) = ?, CONTACTCODE VARCHAR(50) = ?, DATEBEGIN DATE = ?, DATEEND DATE = ?, GOODCODE VARCHAR(50) = ?, PRICE DOUBLE PRECISION = ?, ENDPRICE DOUBLE PRECISION = ?)
 AS
 DECLARE variable ID INTEGER;
 DECLARE variable LID INTEGER;
@@ -76,19 +76,22 @@ export const loadProtocol = async (
   const tr = await attachment.startTransaction();
   try {
     try {
+      console.log('1');
       const st = await attachment.prepare(tr, eb);
+      console.log('2');
       for (const i of data) {
         await st.execute(tr, [
           i.code,
           i.number,
-          i.contactcode,
           i.contractcode,
+          i.contactcode, 
           i.datebegin,
           i.dateend,
           i.goodcode,
-          i.price,
-          i.endprice,
+          new Date(i.price),
+          new Date(i.endprice),
         ]);
+        console.log('item2',  i);
       }
     } catch (err) {
       console.error(err);

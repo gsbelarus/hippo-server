@@ -1,9 +1,9 @@
 import { Attachment } from "node-firebird-driver";
-import { execPath } from "process";
+//import { execPath } from "process";
 import { Contract } from "../types";
 
 const eb = `/* contract */
-EXECUTE BLOCK (CODE VARCHAR(50) = ?, NUMBER VARCHAR(50) = :NUMBER, CONTACTCODE VARCHAR(50) = :CONTACTCODE, DATEBEGIN DATE = :DATEBEGIN, DATEEND DATE = :DATEEND)
+EXECUTE BLOCK (CODE VARCHAR(50) = ?, NUMBER VARCHAR(50) = ?, CONTACTCODE VARCHAR(50) = ?, DATEBEGIN DATE = ?, DATEEND DATE = ?)
 AS
 DECLARE variable ID INTEGER;
 DECLARE variable CONID INTEGER;
@@ -52,13 +52,15 @@ export const loadContract = async (
       const st = await attachment.prepare(tr, eb);
       console.log('2');
       for (const i of data) {
+        console.log('item1',  i, new Date(i.datebegin));
         await st.execute(tr, [
           i.code,
           i.number,
           i.contactcode,
-          i.datebegin,
-          i.dateend,
-        ]);
+          new Date(i.datebegin) ,
+          new Date(i.dateend),
+          ]);
+        console.log('item2',  i);
       }
     } catch (err) {
       console.error(err);
