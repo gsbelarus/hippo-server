@@ -1,4 +1,4 @@
-import { Attachment } from "node-firebird-driver";
+import { Attachment, Transaction } from "node-firebird-driver";
 import { execPath } from "process";
 import { Contact } from "../types";
 import iconv from "iconv-lite";
@@ -40,30 +40,12 @@ const eb = ` EXECUTE BLOCK (CODE VARCHAR(50) = ?, NAME VARCHAR(200) = ?, ADDRESS
     END
   END`;
 
-export const loadContact = async (data: Contact[], attachment: Attachment) => {
-  const tr = await attachment.startTransaction();
-  try {
-    try {
-      console.log('1');
-      const st = await attachment.prepare(tr, eb);
-      console.log('2');
-      for (const i of data) {
-        await st.execute(tr, [
-          i.code,
-          convertingToASCII(i.name),
-          convertingToASCII(i.address || ''),
-          i.phone,
-          convertingToASCII(i.email || ''),
-          i.gln,
-          i.taxid,
-        ]);
-        console.log('item2',  i)
-      }
-    } catch (err) {
-      console.error(err);
-      await tr.rollback();
+  export const loadContact = async (data: Contact[], attachment: Attachment, transaction: Transaction) => {
+    const st = await attachment.prepare(transaction, eb);
+    for (const rec of data) {
+      await st.execute(transaction, [rec.code, convertingToASCII (rec.name), convertingToASCII (rec.address), rec.phone, convertingToASCII (rec.email), rec.gln, rec.taxid]);
     }
-  } finally {
-    await tr.commit();
-  }
-};
+  };
+  
+
+

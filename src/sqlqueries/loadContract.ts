@@ -1,4 +1,4 @@
-import { Attachment } from "node-firebird-driver";
+import { Attachment, Transaction } from "node-firebird-driver";
 //import { execPath } from "process";
 import { Contract } from "../types";
 
@@ -29,48 +29,24 @@ BEGIN
   IF (ID IS NULL) THEN
   BEGIN
     INSERT INTO GD_DOCUMENT (DOCUMENTTYPEKEY, PARENT, COMPANYKEY, AFULL, ACHAG, AVIEW, CREATORKEY, CREATIONDATE, EDITORKEY, EDITIONDATE, NUMBER, DOCUMENTDATE)
-    VALUES (:DOCTYPE, NULL, 650010, -1, -1, -1, 650002, current_timestamp, 650002, current_timestamp, :NUMBER, :DATEBEGIN) RETURNING ID INTO :ID;
+    VALUES (:DOCTYPE, NULL, 650010, -1, -1, -1, 650002, current_timestamp, 650002, current_timestamp, LEFT(:NUMBER, 20), :DATEBEGIN) RETURNING ID INTO :ID;
     INSERT INTO USR$INV_CONTRACT(DOCUMENTKEY, USR$LSF_CODE, USR$CONTACTKEY, USR$DATEEND) VALUES (:ID, :CODE, :CONID, :DATEEND);
   END
   ELSE
   BEGIN
-    UPDATE GD_DOCUMENT SET NUMBER = :NUMBER, DOCUMENTDATE = :DATEBEGIN WHERE ID = :ID;
+    UPDATE GD_DOCUMENT SET NUMBER = LEFT(:NUMBER, 20), DOCUMENTDATE = :DATEBEGIN WHERE ID = :ID;
     UPDATE USR$INV_CONTRACT SET USR$CONTACTKEY = :CONID, USR$DATEEND = :DATEEND WHERE DOCUMENTKEY = :ID;
   END
 END
 `;
 
-export const loadContract = async (
-  
-  data: Contract[],
-  attachment: Attachment
-) => {
-  const tr = await attachment.startTransaction();
-  try {
-    try {
-      console.log('1');
-      const st = await attachment.prepare(tr, eb);
-      console.log('2');
-      for (const i of data) {
-        console.log('item1',  i, new Date(i.datebegin));
-        await st.execute(tr, [
-          i.code,
-          i.number,
-          i.contactcode,
-          new Date(i.datebegin) ,
-          new Date(i.dateend),
-          ]);
-        console.log('item2',  i);
-      }
-    } catch (err) {
-      console.error(err);
-      await tr.rollback();
-    }
-  } finally {
-    await tr.commit();
+export const loadContract = async (data: Contract[], attachment: Attachment, transaction: Transaction) => {
+  const st = await attachment.prepare(transaction, eb);
+  for (const rec of data) {
+    console.log(rec);
+    await st.execute(transaction, 
+      [rec.code, rec.number || 'б/н', rec.contactcode, rec.datebegin ? new Date (rec.datebegin) : new Date(), rec.dateend && new Date (rec.dateend)]);
   }
 };
-function contract(arg0: string, contract: any) {
-  throw new Error("Function not implemented.");
-}
+
 

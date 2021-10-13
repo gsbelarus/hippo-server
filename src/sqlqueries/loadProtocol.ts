@@ -1,4 +1,4 @@
-import { Attachment } from "node-firebird-driver";
+import { Attachment, Transaction } from "node-firebird-driver";
 import { Protocol } from "../types";
 //import { execPath } from "process";
 
@@ -12,6 +12,7 @@ DECLARE variable CONTRID INTEGER;
 DECLARE variable GOODID INTEGER;
 DECLARE variable DOCTYPE INTEGER;
 DECLARE variable GROUPKEY INTEGER;
+DECLARE variable RELDATE DATE;
 BEGIN
 
   SELECT DOCUMENTKEY
@@ -23,12 +24,12 @@ BEGIN
   FROM GD_CONTACT
   WHERE USR$LSF_CODE = :CONTACTCODE
   INTO :CONID;
-  
+
   SELECT DOCUMENTKEY
   FROM USR$INV_CONTRACT
   WHERE USR$LSF_CODE = :CONTRACTCODE
   INTO :CONTRID;
-  
+
   SELECT ID
   FROM GD_GOOD
   WHERE USR$LSF_CODE = :GOODCODE
@@ -37,67 +38,63 @@ BEGIN
   select p.id
   from gd_p_getid(147005904, 63934951) p
   into :GROUPKEY;
-  
+
+  RELDATE = :DATEEND;
+  IF (RELDATE IS NULL) THEN
+  BEGIN
+  RELDATE = :DATEBEGIN;
+  END
+
   IF (GOODID IS NULL) THEN
   BEGIN
-    INSERT INTO GD_GOOD (USR$LSF_CODE, NAME, GROUPKEY, VALUEKEY, CREATORKEY, CREATIONDATE, EDITORKEY, EDITIONDATE) VALUES (:GOODCODE, 'Неизвестный товар', :GROUPKEY, 3000001, 650002, current_timestamp, 650002, current_timestamp) RETURNING ID INTO :GOODID;
+    INSERT INTO GD_GOOD (USR$LSF_CODE, NAME, GROUPKEY, VALUEKEY, CREATORKEY, CREATIONDATE, EDITORKEY, EDITIONDATE) VALUES (:GOODCODE, 'Íåèçâåñòíûé òîâàð', :GROUPKEY, 3000001, 650002, current_timestamp, 650002, current_timestamp) RETURNING ID INTO :GOODID;
   END
-  
+
   select p.id
   from gd_p_getid(151269263, 623967871) p
   into :DOCTYPE;
-  
-  SELECT
-  GEN_ID(gd_g_unique, 1) + GEN_ID(gd_g_offset, 0) AS NewID
-  FROM RDB$DATABASE
-  INTO :LID;
 
   IF (ID IS NULL) THEN
   BEGIN
     INSERT INTO GD_DOCUMENT (DOCUMENTTYPEKEY, PARENT, COMPANYKEY, AFULL, ACHAG, AVIEW, CREATORKEY, CREATIONDATE, EDITORKEY, EDITIONDATE, NUMBER, DOCUMENTDATE)
     VALUES (:DOCTYPE, NULL, 650010, -1, -1, -1, 650002, current_timestamp, 650002, current_timestamp, :NUMBER, :DATEBEGIN) RETURNING ID INTO :ID;
-    INSERT INTO INV_PRICE(DOCUMENTKEY, USR$LSF_CODE, USR$CONTACTKEY, USR$CONTRACTKEY, RELEVANCEDATE) VALUES (:ID, :CODE, :CONID, :CONTRID, :DATEEND);
+    INSERT INTO INV_PRICE(DOCUMENTKEY, NAME, USR$LSF_CODE, USR$CONTACTKEY, USR$CONTRACTKEY, RELEVANCEDATE) VALUES (:ID, 'Ïðàéñ äëÿ ðîçíèöû', :CODE, :CONID, :CONTRID, :RELDATE);
     INSERT INTO GD_DOCUMENT (DOCUMENTTYPEKEY, PARENT, COMPANYKEY, AFULL, ACHAG, AVIEW, CREATORKEY, CREATIONDATE, EDITORKEY, EDITIONDATE, NUMBER, DOCUMENTDATE)
     VALUES (:DOCTYPE, :ID, 650010, -1, -1, -1, 650002, current_timestamp, 650002, current_timestamp, :NUMBER, :DATEBEGIN) RETURNING ID INTO :LID;
-    INSERT INTO INV_PRICELINE(DOCUMENTKEY, GOODKEY, USR$INV_COSTACCNCU, USR$INV_COSTWITHNDS) VALUES (:LID, :GOODID, CAST(:PRICE AS DECIMAL(15,4)), CAST(:ENDPRICE AS DECIMAL(15,4)));
+    INSERT INTO INV_PRICELINE(DOCUMENTKEY, PRICEKEY, GOODKEY, USR$INV_COSTACCNCU, USR$INV_COSTWITHNDS) VALUES (:LID, :ID, :GOODID, CAST(:PRICE AS DECIMAL(15,4)), CAST(:ENDPRICE AS DECIMAL(15,4)));
   END
   ELSE
   BEGIN
+    SELECT DOCUMENTKEY
+    FROM INV_PRICELINE
+    WHERE pricekey = :ID
+    AND GOODKEY = :GOODID
+    INTO :LID;
+    
     UPDATE GD_DOCUMENT SET NUMBER = :NUMBER, DOCUMENTDATE = :DATEBEGIN WHERE ID = :ID;
-    UPDATE INV_PRICE SET USR$CONTACTKEY = :CONID, USR$CONTRACTKEY = :CONTRID, RELEVANCEDATE = :DATEEND WHERE DOCUMENTKEY = :ID;
-    UPDATE OR INSERT INTO INV_PRICELINE (GOODKEY, USR$INV_COSTACCNCU, USR$INV_COSTWITHNDS) VALUES(:GOODID, CAST(:PRICE AS DECIMAL(15,4)), CAST(:ENDPRICE AS DECIMAL(15,4))) MATCHING(GOODKEY);
+    UPDATE INV_PRICE SET USR$CONTACTKEY = :CONID, USR$CONTRACTKEY = :CONTRID, RELEVANCEDATE = :RELDATE WHERE DOCUMENTKEY = :ID;
+
+    IF (LID IS NULL) THEN
+    BEGIN
+      INSERT INTO GD_DOCUMENT (DOCUMENTTYPEKEY, PARENT, COMPANYKEY, AFULL, ACHAG, AVIEW, CREATORKEY, CREATIONDATE, EDITORKEY, EDITIONDATE, NUMBER, DOCUMENTDATE)
+      VALUES (:DOCTYPE, :ID, 650010, -1, -1, -1, 650002, current_timestamp, 650002, current_timestamp, :NUMBER, :DATEBEGIN) RETURNING ID INTO :LID;
+      INSERT INTO INV_PRICELINE(DOCUMENTKEY, PRICEKEY, GOODKEY, USR$INV_COSTACCNCU, USR$INV_COSTWITHNDS) VALUES (:LID, :ID, :GOODID, CAST(:PRICE AS DECIMAL(15,4)), CAST(:ENDPRICE AS DECIMAL(15,4)));
+    END
+    ELSE
+    BEGIN
+      UPDATE INV_PRICELINE SET USR$INV_COSTACCNCU = CAST(:PRICE AS DECIMAL(15,4)), USR$INV_COSTWITHNDS = CAST(:ENDPRICE AS DECIMAL(15,4)) WHERE GOODKEY = :GOODID AND DOCUMENTKEY = :LID;
+    END
   END
 END`;
 
-export const loadProtocol = async (
-  data: Protocol[],
-  attachment: Attachment
-) => {
-  const tr = await attachment.startTransaction();
-  try {
-    try {
-      console.log('1');
-      const st = await attachment.prepare(tr, eb);
-      console.log('2');
-      for (const i of data) {
-        await st.execute(tr, [
-          i.code,
-          i.number,
-          i.contractcode,
-          i.contactcode, 
-          i.datebegin,
-          i.dateend,
-          i.goodcode,
-          new Date(i.price),
-          new Date(i.endprice),
-        ]);
-        console.log('item2',  i);
-      }
-    } catch (err) {
-      console.error(err);
-      await tr.rollback();
-    }
-  } finally {
-    await tr.commit();
+export const loadProtocol = async (data: Protocol[], attachment: Attachment, transaction: Transaction) => {
+  const st = await attachment.prepare(transaction, eb);
+  
+  for (const rec of data) {
+    console.log(rec);
+    await st.execute(transaction, [rec.code, rec.number, rec.contractcode, 
+      rec.contactcode, rec.datebegin ? new Date (rec.datebegin) : new Date(), rec.dateend && new Date (rec.dateend), rec.goodcode, rec.price, rec.endprice]);
   }
 };
+
+

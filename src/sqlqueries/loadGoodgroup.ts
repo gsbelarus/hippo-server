@@ -1,4 +1,4 @@
-import { Attachment } from "node-firebird-driver";
+import { Attachment, Transaction } from "node-firebird-driver";
 import { execPath } from "process";
 import { Goodgroup } from "../types";
 
@@ -43,24 +43,11 @@ const eb = ` /* товарные группы */
         UPDATE GD_GOODGROUP SET NAME = :NAME, PARENT = :PARENT WHERE ID = :ID;
       END
     END`;
-export async function loadGoodgroup(data: Goodgroup[], attachment: Attachment) {
-  const tr = await attachment.startTransaction();
-  try {
-    try {
-      console.log('1');
-      const st = await attachment.prepare(tr, eb);
-      console.log('2');
-      for (const i of data) {
-        await st.execute(tr, [i.code, i.name, i.parentcode]);
-        console.log('item', i);
+
+    export const loadGoodgroup = async (data: Goodgroup[], attachment: Attachment, transaction: Transaction) => {
+      const st = await attachment.prepare(transaction, eb);
+      for (const rec of data) {
+        await st.execute(transaction, [rec.code, rec.name, rec.parentcode]);
       }
-    } catch (err) {
-      console.log('err');
-      console.error(err);
-      await tr.rollback();
-    }
-  } finally {
-    console.log('3');
-    await tr.commit();
-  }
-}
+    };
+  

@@ -1,12 +1,11 @@
 import express from "express";
-import { Request, Response, NextFunction } from "express";
+import { Request, Response } from "express";
 import {
   Attachment,
   createNativeClient,
   getDefaultLibraryFilename,
+  Transaction,
 } from "node-firebird-driver-native";
-import bodyParser from "body-parser";
-import { json } from "stream/consumers";
 import {
   Goodgroup,
   Value,
@@ -24,9 +23,10 @@ import {
   loadGoodgroup,
   loadContract,
   loadProtocol,
+  loadClaim,
 } from "./sqlqueries";
 import { dbOptions } from "./config/firebird";
-import { loadClaim } from "./sqlqueries/loadClaim";
+
 
 const client = createNativeClient(getDefaultLibraryFilename());
 
@@ -41,7 +41,7 @@ const attach = () =>
 
 const app = express();
 const PORT = 8000;
-app.use(express.json({limit: "10mb"}));
+app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 app.get("/", async (req, res) => {
@@ -51,31 +51,43 @@ app.get("/", async (req, res) => {
 const appPost = (
   endPoint: string,
   validator: (dataObj: any) => boolean,
-  func: (dataObj: any, attachment: Attachment) => Promise<void>
+  func: (
+    dataObj: any,
+    attachment: Attachment,
+    transaction: Transaction
+  ) => Promise<void>
 ) => {
   app.post(endPoint, async (req: Request, res: Response) => {
     const reqBodyObj = req.body;
     if (validator(reqBodyObj)) {
       try {
         const attachment = await attach();
+        const transaction = await attachment.startTransaction();
+        let success = false;
         try {
-          await func(reqBodyObj.data, attachment);
+          await func(reqBodyObj.data, attachment, transaction);
+          await transaction.commit();
           res.statusCode = 200;
           res.json({ result: "OK", status: 200 });
+          success = true;
         } finally {
+          if (!success) {
+            await transaction.rollback();
+          }
           await attachment.disconnect();
         }
       } catch (err) {
         console.error(err);
+        res.status(500).send(`Firebird error: ${err}`);
       }
     } else {
-      res.status(422).send("Unprocessable Entity");
+      res.status(500).send("Invalid data");
     }
   });
 };
 
 const makeDataValidator =
-  (itemValidator: any, name: string) => (reqBodyObj: any) =>
+  (itemValidator: any, name: string) => (reqBodyObj: any) => 
     typeof reqBodyObj === "object" &&
     reqBodyObj.name === name &&
     Array.isArray(reqBodyObj.data) &&
@@ -91,22 +103,34 @@ const isValueData = (obj: any): obj is Value =>
 
 appPost("/values", makeDataValidator(isValueData, "value"), loadValue);
 
-const isContractData = (obj: any): obj is Contract => true;
-//typeof obj === 'object'
-//&& typeof obj.number === 'string' && obj.number
-//&& typeof obj.code === 'string' && obj.code
-//&& typeof obj.contactcode === 'string' && obj.contactcode;
-//&& typeof obj.datebegin === 'Data' && obj.datebegin;
+const isContractData = (obj: any): obj is Contract =>
+  typeof obj === "object" &&
+  typeof obj.code === "string" && obj.code; 
+  
+  //typeof obj.contactcode === "string" &&
+  //obj.contactcode &&
+  //typeof obj.datebegin === "string" &&
+  //obj.datebegin;
 
-appPost("/contracts", makeDataValidator(isContractData, "contract"), loadContract);
+appPost(
+  "/contracts",
+  makeDataValidator(isContractData, "contract"),
+  loadContract
+);
 
-const isProtocolData = (obj: any): obj is Protocol => true;
-//typeof obj === 'object'
-//&& typeof obj.code === 'string' && obj.code;
-//&& typeof obj.number === 'number' && obj.number
-//&& typeof obj.contactcode === 'string' && obj.contactcode
-//&& typeof obj.goodcode === 'string' && obj.goodcode
-//&& typeof obj.price === 'number' && obj.price;
+const isProtocolData = (obj: any): obj is Protocol =>
+  typeof obj === "object" &&
+  typeof obj.code === "string" &&
+  obj.code; 
+  //&&
+  //typeof obj.number === "number" &&
+  //obj.number &&
+  //typeof obj.contactcode === "string" &&
+  //obj.contactcode &&
+  //typeof obj.goodcode === "string" &&
+  //obj.goodcode &&
+  //typeof obj.price === "number" &&
+  //obj.price;
 
 appPost(
   "/protocols",
@@ -114,7 +138,7 @@ appPost(
   loadProtocol
 );
 
-const isContactData = (obj: any): obj is Contact => true;
+const isContactData = (obj: any): obj is Contact =>
   typeof obj === "object" &&
   typeof obj.name === "string" &&
   obj.name &&
@@ -134,30 +158,29 @@ const isGoodData = (obj: any): obj is Good =>
 
 appPost("/goods", makeDataValidator(isGoodData, "good"), loadGood);
 
-const isGoodgroupData = (obj: any): obj is Goodgroup => 
+const isGoodgroupData = (obj: any): obj is Goodgroup =>
   typeof obj === "object" &&
   typeof obj.name === "string" &&
   obj.name &&
   typeof obj.code === "string" &&
   obj.code;
 
-
 appPost(
   "/goodgroups",
   makeDataValidator(isGoodgroup, "goodgroup"),
   loadGoodgroup
 );
-const isClaim = (obj: any): obj is Claim => 
-  typeof obj === "object"
-  && typeof obj.code === "string" && obj.code
-  && typeof obj.number === "number" && obj.number;
+const isClaim = (obj: any): obj is Claim =>
+  typeof obj === "object" &&
+  typeof obj.goodcode === "string" &&
+  obj.goodcode
+  && typeof obj.number === "string" &&
+  obj.number
+  && typeof obj.docdate === "string" &&
+  obj.docdate;
+  
 
-
-
-appPost("/claims",
-  makeDataValidator(isClaim, "claim"),
-  loadClaim
-);
+appPost("/claims", makeDataValidator(isClaim, "claim"), loadClaim);
 
 app.listen(PORT, () => {
   console.log(`Server now is running on port 8000`);
@@ -171,17 +194,9 @@ const isDataObject = (obj: any): obj is DataObject => {
   return typeof obj === "object" && obj.name && Array.isArray(obj.data);
 };
 
-
-function isGoodgroup(isGoodgroup: any, arg1: string): (dataObj: any) => boolean {
+function isGoodgroup(
+  isGoodgroup: any,
+  arg1: string
+): (dataObj: any) => boolean {
   throw new Error("Function not implemented.");
 }
-// function isGoodgroup(
-  // isGoodgroup: any,
-  // arg1: string
-// ): (dataObj: any) => boolean {
-  // throw new Error("Function not implemented.");
-// }
-//const isGoodData = (obj: any): obj is Good => {
-//  return typeof obj === 'object' && 'name' in obj && 'code' in obj ;
-//};
-

@@ -46,8 +46,8 @@ export interface Contract {
 }
 
 export interface Protocol {
-  code:string;
-  number: number;
+  code?:string;
+  number: string;
   contractcode: string;
   contactcode:string;
   datebegin: Date;
@@ -58,10 +58,10 @@ export interface Protocol {
 }
 
 export interface Claim {
-  code:string;
-  number: number;
+  code?: string;
+  number: string;
   docdate: Date;
-  orderdate:Date;
+  orderdate: Date;
   stringnumber: number;
   goodcode: string;
   quant: number;

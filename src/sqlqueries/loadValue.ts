@@ -1,4 +1,4 @@
-import { Attachment } from "node-firebird-driver";
+import { Attachment, Transaction } from "node-firebird-driver";
 import { execPath } from "process";
 import { Value } from "../types";
 
@@ -31,19 +31,9 @@ BEGIN
   END
 END`;
 
-export const loadValue = async (data: Value[], attachment: Attachment) => {
-  const tr = await attachment.startTransaction();
-  try {
-    try {
-      const st = await attachment.prepare(tr, eb);
-      for (const i of data) {
-        await st.execute(tr, [i.code, i.name, i.shortName]);
-      }
-    } catch (err) {
-      console.error(err);
-      await tr.rollback();
-    }
-  } finally {
-    await tr.commit();
+export const loadValue = async (data: Value[], attachment: Attachment, transaction: Transaction) => {
+  const st = await attachment.prepare(transaction, eb);
+  for (const rec of data) {
+    await st.execute(transaction, [rec.code, rec.name, rec.shortName]);
   }
 };

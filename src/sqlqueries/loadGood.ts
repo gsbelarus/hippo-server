@@ -1,4 +1,4 @@
-import { Attachment } from "node-firebird-driver";
+import { Attachment, Transaction } from "node-firebird-driver";
 import { Good } from "../types";
 
 const eb = `/* товары */
@@ -72,29 +72,14 @@ const eb = `/* товары */
     END
   END`;
 
-  export const loadGood = async (data: Good[], attachment: Attachment) => {
-    const tr = await attachment.startTransaction();
-    try {
-      try {
-        const st = await attachment.prepare(tr, eb);
 
-        for (const i of data) {
-          await st.execute(tr, [        
-            i.code,
-            i.rate,
-            i.name,
-            i.weight || 0,
-            i.disabled || 0,
-            i.barcode || '',
-            i.valuecode || '',
-            i.groupcode || '',
-            i.moq || 0]);
-        }
-      } catch (err) {
-        console.error(err);
-        await tr.rollback();
-      }
-    } finally {
-      await tr.commit();
-    }
-  };
+export const loadGood = async (data: Good[], attachment: Attachment, transaction: Transaction) => {
+  const st = await attachment.prepare(transaction, eb);
+  for (const rec of data) {
+    await st.execute(transaction, [rec.code, rec.rate, rec.name, rec.weight,
+      rec.disabled, rec.barcode, rec.valuecode, rec.groupcode, rec.moq]);
+  }
+};
+
+
+  

@@ -4,5 +4,6 @@ import { loadValue } from "./loadValue";
 import { loadContact } from "./loadContact";
 import { loadContract } from "./loadContract";
 import { loadProtocol } from "./loadProtocol";
+import { loadClaim } from "./loadClaim";
 
-export { loadGood, loadContact, loadValue, loadGoodgroup,loadContract, loadProtocol  };
+export { loadGood, loadContact, loadValue, loadGoodgroup,loadContract, loadProtocol, loadClaim  };
