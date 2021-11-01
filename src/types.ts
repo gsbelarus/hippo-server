@@ -1,3 +1,5 @@
+import { Request } from "express"
+
 export interface DataObject<K = string> {
   name: string;
   data: K[];
@@ -11,7 +13,7 @@ export interface Contact {
   email: string;
   gln: string;
   taxid: string;
- 
+
 }
 
 export interface Value {
@@ -35,7 +37,6 @@ export interface Good {
   groupcode: string;
   moq: number;
 }
-
 
 export interface Contract {
   code:string;
@@ -65,4 +66,17 @@ export interface Claim {
   stringnumber: number;
   goodcode: string;
   quant: number;
+}
+
+export interface IUser {
+  name: string;
+  password: string;
+}
+
+export interface IUserRequest extends Request {
+  user: IUser;
+}
+
+export type AuthToken = {
+  [name: string]: IUser;
 }

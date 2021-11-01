@@ -1,5 +1,6 @@
-import express from "express";
-import { Request, Response } from "express";
+import express, { NextFunction, Response, Request } from "express";
+import cookieParser from "cookie-parser";
+import Datastore from 'nedb';
 import {
   Attachment,
   createNativeClient,
@@ -15,6 +16,9 @@ import {
   Contract,
   Protocol,
   Claim,
+  IUserRequest,
+  IUser,
+  AuthToken,
 } from "./types";
 import {
   loadContact,
@@ -26,9 +30,13 @@ import {
   loadClaim,
 } from "./sqlqueries";
 import { dbOptions } from "./config/firebird";
-
+import { generateAuthToken, getHashedPassword } from "./utils";
+import bcrypt from 'bcrypt';
 
 const client = createNativeClient(getDefaultLibraryFilename());
+
+const db = new Datastore({filename : 'users'});
+db.loadDatabase();
 
 const attach = () =>
   client.connect(
@@ -43,13 +51,112 @@ const app = express();
 const PORT = 8000;
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(cookieParser());
+
+const findOne = async(token: string): Promise<IUser | void> => {
+  console.log('1');
+  db.findOne({authToken: token}, (err: any, item: any) => {
+    console.log('11', item.user);
+    // Добавление авторизованного пользователя в запрос
+    return user;
+  });
+}
+
+app.use(async(req: any, res: Response, next: NextFunction) => {
+    // Получение значения из cookie
+    const authToken = req.cookies['AuthToken'];
+    console.log('0', authToken);
+    const user = await findOne(authToken);
+    console.log('2');
+    req.user = user;
+    next();
+});
+
+const requireAuth = async (req: any , res: Response) => {
+  console.log('3', req.user);
+  if (req.user) {
+    //next();
+  } else {
+    res.status(401).send ("Не пройдена аутентификация");
+  }
+};
+
+app.get("/docs", requireAuth, (req, res) => {
+  res.send("We have done successfull connection to a database");
+});
+
+app.post("/logout", (req, res) => {
+  const authToken = req.cookies['AuthToken'];
+  //delete authTokens[authToken];
+  db.remove({authToken: authToken}, {});
+  delete req.cookies['AuthToken'];
+  res.send("Logout");
+});
 
 app.get("/", async (req, res) => {
   res.send("We have done successfull connection to a database");
 });
 
+const authTokens: AuthToken = {};
+
+const user: IUser = {
+  name: 'User',
+  password: '$2b$10$zWm7EcFdQ3TXQ3jXoLqC5.byzS1w4.CEbhP1Fk/kG6NWjRt3a/slK',
+}
+
+const users = [user];
+
+//  (async () => {
+//   const p = await getHashedPassword('user1');
+//   console.log('fff', p);
+// })();
+
+app.get("/login", async (req, res) => {
+  const { name, password } = req.body;
+
+  const user = users.find(u => {
+    return name === u.name
+  });
+
+  if (!user) {
+    res.status(404).send ("Неверное имя пользователя");
+    return;
+  }
+
+  const hashedPassword = user.password;
+
+  if (await bcrypt.compare(password, hashedPassword)) {
+    const authToken = generateAuthToken();
+
+    //authTokens[authToken] = user;
+    db.insert({ authToken, user });
+
+    // Установка токена авторизации в куки
+    res.cookie('AuthToken', authToken, {
+      maxAge: 3600 * 24 * 7,
+      // secure: true,
+    });
+
+    // const dd = db.getAllData();
+
+    // console.log('db', dd);
+
+    db.findOne({authToken: authToken}, function (err: any, user: IUser) {
+      // console.log('authToken', user);
+      // Добавление авторизованного пользователя в запрос
+      // console.log('db', user);
+    });
+    // res.cookie('AuthToken', authToken);
+
+    res.status(200).send("Аутентификация пройдена успешно");
+  } else {
+    res.status(401).send ("Неверный пароль");
+  }
+});
+
 const appPost = (
   endPoint: string,
+  authMiddleware: (req: Request, res: Response) => Promise<void>,
   validator: (dataObj: any) => boolean,
   func: (
     dataObj: any,
@@ -57,7 +164,8 @@ const appPost = (
     transaction: Transaction
   ) => Promise<void>
 ) => {
-  app.post(endPoint, async (req: Request, res: Response) => {
+  app.post(endPoint, authMiddleware, async (req: Request, res: Response) => {
+    // await authMiddleware(req, res);
     const reqBodyObj = req.body;
     if (validator(reqBodyObj)) {
       try {
@@ -87,7 +195,7 @@ const appPost = (
 };
 
 const makeDataValidator =
-  (itemValidator: any, name: string) => (reqBodyObj: any) => 
+  (itemValidator: any, name: string) => (reqBodyObj: any) =>
     typeof reqBodyObj === "object" &&
     reqBodyObj.name === name &&
     Array.isArray(reqBodyObj.data) &&
@@ -101,12 +209,12 @@ const isValueData = (obj: any): obj is Value =>
   typeof obj.code === "string" &&
   obj.code;
 
-appPost("/values", makeDataValidator(isValueData, "value"), loadValue);
+appPost("/values", requireAuth, makeDataValidator(isValueData, "value"), loadValue);
 
 const isContractData = (obj: any): obj is Contract =>
   typeof obj === "object" &&
-  typeof obj.code === "string" && obj.code; 
-  
+  typeof obj.code === "string" && obj.code;
+
   //typeof obj.contactcode === "string" &&
   //obj.contactcode &&
   //typeof obj.datebegin === "string" &&
@@ -114,6 +222,7 @@ const isContractData = (obj: any): obj is Contract =>
 
 appPost(
   "/contracts",
+  requireAuth,
   makeDataValidator(isContractData, "contract"),
   loadContract
 );
@@ -121,7 +230,7 @@ appPost(
 const isProtocolData = (obj: any): obj is Protocol =>
   typeof obj === "object" &&
   typeof obj.code === "string" &&
-  obj.code; 
+  obj.code;
   //&&
   //typeof obj.number === "number" &&
   //obj.number &&
@@ -134,6 +243,7 @@ const isProtocolData = (obj: any): obj is Protocol =>
 
 appPost(
   "/protocols",
+  requireAuth,
   makeDataValidator(isProtocolData, "protocol"),
   loadProtocol
 );
@@ -145,7 +255,7 @@ const isContactData = (obj: any): obj is Contact =>
   typeof obj.code === "string" &&
   obj.code;
 
-appPost("/contacts", makeDataValidator(isContactData, "contact"), loadContact);
+appPost("/contacts", requireAuth, makeDataValidator(isContactData, "contact"), loadContact);
 
 const isGoodData = (obj: any): obj is Good =>
   typeof obj === "object" &&
@@ -156,7 +266,7 @@ const isGoodData = (obj: any): obj is Good =>
   typeof obj.groupcode === "string" &&
   obj.groupcode;
 
-appPost("/goods", makeDataValidator(isGoodData, "good"), loadGood);
+appPost("/goods", requireAuth, makeDataValidator(isGoodData, "good"), loadGood);
 
 const isGoodgroupData = (obj: any): obj is Goodgroup =>
   typeof obj === "object" &&
@@ -167,6 +277,7 @@ const isGoodgroupData = (obj: any): obj is Goodgroup =>
 
 appPost(
   "/goodgroups",
+  requireAuth,
   makeDataValidator(isGoodgroup, "goodgroup"),
   loadGoodgroup
 );
@@ -178,9 +289,9 @@ const isClaim = (obj: any): obj is Claim =>
   obj.number
   && typeof obj.docdate === "string" &&
   obj.docdate;
-  
 
-appPost("/claims", makeDataValidator(isClaim, "claim"), loadClaim);
+
+appPost("/claims", requireAuth, makeDataValidator(isClaim, "claim"), loadClaim);
 
 app.listen(PORT, () => {
   console.log(`Server now is running on port 8000`);
@@ -200,3 +311,5 @@ function isGoodgroup(
 ): (dataObj: any) => boolean {
   throw new Error("Function not implemented.");
 }
+
+

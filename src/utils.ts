@@ -1,8 +1,28 @@
+import crypto from 'crypto';
+import bcrypt from 'bcrypt';
+
 export const convertingToASCII = (s: string | undefined) =>
  s && s
 .replace(/\u0142/g, "l")
 .replace(/\u00DF/g, "s")
 .normalize('NFKD').replace(/[\u0300-\u036f]/g, "");
+
+const SALT_ROUND = 10;
+
+export const getHashedPassword = async (password: string): Promise<string> => {
+  const salt = await bcrypt.genSalt(SALT_ROUND);
+  return bcrypt.hash(password, salt);
+};
+
+// export const getHashedPassword = (password: string) => {
+//   const sha256 = crypto.createHash('sha256');
+//   const hash = sha256.update(password).digest('base64');
+//   return hash;
+// }
+
+export const generateAuthToken = () => {
+  return crypto.randomBytes(30).toString('hex');
+}
 
 // (s: string | undefined) => s && s.normalize('NFKD').replace(combining, '');
 // const combining = /[\u0300-\u036F]/g;   "NFC" | "NFD" | "NFKC" | "NFKD"
@@ -10,9 +30,9 @@ export const convertingToASCII = (s: string | undefined) =>
 
 
 /**
- * 
+ *
  * @param convert Polish Al
- * @returns 
+ * @returns
 /*export const convertPolishToASCII = (s: string | undefined) => s && s.split('')
   .map( l => upperPolishLetters[l] ?? lowerPolishLetters[l] ?? l )
   .join('');
