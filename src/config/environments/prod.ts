@@ -22,34 +22,43 @@ export default {
    /**
     * Firebird database host (localhost or IP adress)
     */
- 
+
    FIREBIRD_HOST: 'localhost',
- 
+
    /**
     * Firebird database Port (mainly 3050)
     */
    FIREBIRD_PORT: 3050,
- 
+
    /**
     * Firebird database path
     * d:\TEST.FDB
     */
- 
+
    FIREBIRD_DATABASE: 'TEST',
- 
+
    /**
     * Firebird connection username
     */
- 
+
    FIREBIRD_USER: 'SYSDBA',
- 
+
    /**
     * Firebird connection password
     */
    FIREBIRD_PASSWORD: 'masterkey',
- 
+
    /**
     * Application version
     */
    VERSION: '0.0.1',
+   /**
+    * user name
+    */
+   USER_NAME: 'User',
+
+   /**
+    * user password
+    */
+   USER_PASSWORD: '$2b$10$zWm7EcFdQ3TXQ3jXoLqC5.byzS1w4.CEbhP1Fk/kG6NWjRt3a/slK',
  };

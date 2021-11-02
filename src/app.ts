@@ -12,13 +12,10 @@ import {
   Value,
   Contact,
   Good,
-  DataObject,
   Contract,
   Protocol,
   Claim,
-  IUserRequest,
   IUser,
-  AuthToken,
 } from "./types";
 import {
   loadContact,
@@ -30,13 +27,22 @@ import {
   loadClaim,
 } from "./sqlqueries";
 import { dbOptions } from "./config/firebird";
-import { generateAuthToken, getHashedPassword } from "./utils";
+import config from '../src/config/environment';
+import { generateAuthToken } from "./utils";
 import bcrypt from 'bcrypt';
+import { findOne, insert, remove } from "./neDb";
 
 const client = createNativeClient(getDefaultLibraryFilename());
 
-const db = new Datastore({filename : 'users'});
+const db = new Datastore();
 db.loadDatabase();
+
+const user: IUser = {
+  name: config.USER_NAME,
+  password: config.USER_PASSWORD,
+};
+
+const users = [user];
 
 const attach = () =>
   client.connect(
@@ -53,69 +59,38 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
-const findOne = async(token: string): Promise<IUser | void> => {
-  console.log('1');
-  db.findOne({authToken: token}, (err: any, item: any) => {
-    console.log('11', item.user);
-    // Добавление авторизованного пользователя в запрос
-    return user;
-  });
-}
 
+// Выполняется при каждом запросе
 app.use(async(req: any, res: Response, next: NextFunction) => {
     // Получение значения из cookie
     const authToken = req.cookies['AuthToken'];
-    console.log('0', authToken);
-    const user = await findOne(authToken);
-    console.log('2');
-    req.user = user;
+    // Поиск пользователя из db по токену
+    const item = await findOne(db, {authToken});
+    // Сохраняем объект пользователя в свойство user,
+    // чтобы в следующих запросах разрешить доступ этому пользователю
+    req.user = item?.user;
     next();
 });
 
-const requireAuth = async (req: any , res: Response) => {
-  console.log('3', req.user);
+// Middleware для проверки пользователя
+// Подставляем его в те запросы, где важна аутентификация
+const requireAuth = async (req: any , res: Response, next: NextFunction) => {
   if (req.user) {
-    //next();
+    next();
   } else {
     res.status(401).send ("Не пройдена аутентификация");
   }
 };
 
-app.get("/docs", requireAuth, (req, res) => {
-  res.send("We have done successfull connection to a database");
-});
-
-app.post("/logout", (req, res) => {
-  const authToken = req.cookies['AuthToken'];
-  //delete authTokens[authToken];
-  db.remove({authToken: authToken}, {});
-  delete req.cookies['AuthToken'];
-  res.send("Logout");
-});
-
 app.get("/", async (req, res) => {
   res.send("We have done successfull connection to a database");
 });
 
-const authTokens: AuthToken = {};
-
-const user: IUser = {
-  name: 'User',
-  password: '$2b$10$zWm7EcFdQ3TXQ3jXoLqC5.byzS1w4.CEbhP1Fk/kG6NWjRt3a/slK',
-}
-
-const users = [user];
-
-//  (async () => {
-//   const p = await getHashedPassword('user1');
-//   console.log('fff', p);
-// })();
-
 app.get("/login", async (req, res) => {
-  const { name, password } = req.body;
+  const { username, password } = req.body;
 
   const user = users.find(u => {
-    return name === u.name
+    return username === u.name
   });
 
   if (!user) {
@@ -125,28 +100,19 @@ app.get("/login", async (req, res) => {
 
   const hashedPassword = user.password;
 
+  //Сравним пришедший пароль с тем, который хранится у нас
   if (await bcrypt.compare(password, hashedPassword)) {
+    //Сгенерируем новый токен
     const authToken = generateAuthToken();
 
-    //authTokens[authToken] = user;
-    db.insert({ authToken, user });
+    //Сохраним новый токен в bd для вошедшего пользователя
+    await insert(db, { authToken, user });
 
-    // Установка токена авторизации в куки
+    // Установим токен авторизации в куки
     res.cookie('AuthToken', authToken, {
       maxAge: 3600 * 24 * 7,
       // secure: true,
     });
-
-    // const dd = db.getAllData();
-
-    // console.log('db', dd);
-
-    db.findOne({authToken: authToken}, function (err: any, user: IUser) {
-      // console.log('authToken', user);
-      // Добавление авторизованного пользователя в запрос
-      // console.log('db', user);
-    });
-    // res.cookie('AuthToken', authToken);
 
     res.status(200).send("Аутентификация пройдена успешно");
   } else {
@@ -154,9 +120,18 @@ app.get("/login", async (req, res) => {
   }
 });
 
+app.post("/logout", async (req, res) => {
+  const authToken = req.cookies['AuthToken'];
+  //Удаляем из db запись с текущем пользователем
+  await remove(db, {authToken});
+  //Удаляем токен из куков
+  delete req.cookies['AuthToken'];
+  res.status(200).send ("Пользователь успешно вышел");
+});
+
 const appPost = (
   endPoint: string,
-  authMiddleware: (req: Request, res: Response) => Promise<void>,
+  authMiddleware: (req: Request, res: Response, next: NextFunction) => Promise<void>,
   validator: (dataObj: any) => boolean,
   func: (
     dataObj: any,
@@ -165,7 +140,6 @@ const appPost = (
   ) => Promise<void>
 ) => {
   app.post(endPoint, authMiddleware, async (req: Request, res: Response) => {
-    // await authMiddleware(req, res);
     const reqBodyObj = req.body;
     if (validator(reqBodyObj)) {
       try {
@@ -175,8 +149,7 @@ const appPost = (
         try {
           await func(reqBodyObj.data, attachment, transaction);
           await transaction.commit();
-          res.statusCode = 200;
-          res.json({ result: "OK", status: 200 });
+          res.status(200).send("Ok");
           success = true;
         } finally {
           if (!success) {
@@ -278,7 +251,7 @@ const isGoodgroupData = (obj: any): obj is Goodgroup =>
 appPost(
   "/goodgroups",
   requireAuth,
-  makeDataValidator(isGoodgroup, "goodgroup"),
+  makeDataValidator(isGoodgroupData, "goodgroup"),
   loadGoodgroup
 );
 const isClaim = (obj: any): obj is Claim =>
@@ -297,19 +270,39 @@ app.listen(PORT, () => {
   console.log(`Server now is running on port 8000`);
 });
 
-function data(data: any, attachment: Attachment) {
-  throw new Error("Function not implemented.");
-}
+// function data(data: any, attachment: Attachment) {
+//   throw new Error("Function not implemented.");
+// }
 
-const isDataObject = (obj: any): obj is DataObject => {
-  return typeof obj === "object" && obj.name && Array.isArray(obj.data);
+// const isDataObject = (obj: any): obj is DataObject => {
+//   return typeof obj === "object" && obj.name && Array.isArray(obj.data);
+// };
+
+// function isGoodgroup(
+//   isGoodgroup: any,
+//   arg1: string
+// ): (dataObj: any) => boolean {
+//   throw new Error("Function not implemented.");
+// }
+
+/**
+ * При завершении работы удаляем все данные
+ */
+
+const shutdown = async (msg: string) => {
+  await remove(db, {});
 };
 
-function isGoodgroup(
-  isGoodgroup: any,
-  arg1: string
-): (dataObj: any) => boolean {
-  throw new Error("Function not implemented.");
-}
-
+process
+  .on('exit', code => console.log(`Process exit event with code: ${code}`) )
+  .on('SIGINT', async () => {
+    await shutdown('SIGINT received...');
+    process.exit();
+  })
+  .on('SIGTERM', async () => {
+    await shutdown('SIGTERM received...');
+    process.exit();
+  })
+  .on('unhandledRejection', (reason, p) => console.error({ err: reason }, p) )
+  .on('uncaughtException', err => console.error(err) );
 
