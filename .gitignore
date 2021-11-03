@@ -1,12 +1,9 @@
 dist/
 node_modules/
 
-src/config/environnements/dev.ts
-src/config/environnements/prod.ts
-
 logs/*
 
 package-lock.json
 
-src/config/environments/dev.ts
-src/config/environments/prod.ts
+/src/config/environments/dev.ts
+/src/config/environments/prod.ts

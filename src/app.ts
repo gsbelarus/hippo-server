@@ -63,7 +63,8 @@ app.use(cookieParser());
 // Выполняется при каждом запросе
 app.use(async(req: any, res: Response, next: NextFunction) => {
     // Получение значения из cookie
-    const authToken = req.cookies['AuthToken'];
+    //const authToken = req.cookies['AuthToken'];
+    const authToken = req.headers['authtoken'];
     // Поиск пользователя из db по токену
     const item = await findOne(db, {authToken});
     // Сохраняем объект пользователя в свойство user,
@@ -108,11 +109,13 @@ app.get("/login", async (req, res) => {
     //Сохраним новый токен в bd для вошедшего пользователя
     await insert(db, { authToken, user });
 
-    // Установим токен авторизации в куки
-    res.cookie('AuthToken', authToken, {
-      maxAge: 3600 * 24 * 7,
-      // secure: true,
-    });
+    // // Установим токен авторизации в куки
+    // res.cookie('AuthToken', authToken, {
+    //   maxAge: 3600 * 24 * 7,
+    //   // secure: true,
+    // });
+
+    res.setHeader('authtoken', authToken);
 
     res.status(200).send("Аутентификация пройдена успешно");
   } else {
