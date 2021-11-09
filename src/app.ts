@@ -60,33 +60,35 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
 
-// Выполняется при каждом запросе
-app.use(async(req: any, res: Response, next: NextFunction) => {
-    // Получение значения из cookie
-    const authToken = req.cookies['AuthToken'];
-    // Поиск пользователя из db по токену
-    const item = await findOne(db, {authToken});
-    // Сохраняем объект пользователя в свойство user,
-    // чтобы в следующих запросах разрешить доступ этому пользователю
-    req.user = item?.user;
-    next();
+app.use(async (req: any, res: Response, next: NextFunction) => {
+
+  // Получение значения из header
+  const authToken = req.headers['authtoken'];
+  console.log('req.headers', authToken);
+  // Поиск пользователя из db по токену
+  const item = await findOne(db, { authToken });
+  // Сохраняем объект пользователя в свойство user,
+  // чтобы в следующих запросах разрешить доступ этому пользователю
+  req.user = item?.user;
+  console.log('item?.user', item?.user);
+  next();
 });
 
 // Middleware для проверки пользователя
 // Подставляем его в те запросы, где важна аутентификация
-const requireAuth = async (req: any , res: Response, next: NextFunction) => {
+const requireAuth = async (req: any, res: Response, next: NextFunction) => {
   if (req.user) {
     next();
   } else {
-    res.status(401).send ("Не пройдена аутентификация");
+    res.status(401).send("Не пройдена аутентификация");
   }
 };
 
-app.get("/", async (req, res) => {
-  res.send("We have done successfull connection to a database");
+app.get("/", requireAuth, async (req, res) => {
+  res.send("Подключение к базе данных");
 });
 
-app.get("/login", async (req, res) => {
+app.post("/login", async (req, res) => {
   const { username, password } = req.body;
 
   const user = users.find(u => {
@@ -94,7 +96,7 @@ app.get("/login", async (req, res) => {
   });
 
   if (!user) {
-    res.status(404).send ("Неверное имя пользователя");
+    res.status(404).send("Неверное имя пользователя");
     return;
   }
 
@@ -108,25 +110,25 @@ app.get("/login", async (req, res) => {
     //Сохраним новый токен в bd для вошедшего пользователя
     await insert(db, { authToken, user });
 
-    // Установим токен авторизации в куки
-    res.cookie('AuthToken', authToken, {
-      maxAge: 3600 * 24 * 7,
-      // secure: true,
-    });
+    // Установим токен авторизации в Header
+
+    res.setHeader('authtoken', authToken)
 
     res.status(200).send("Аутентификация пройдена успешно");
   } else {
-    res.status(401).send ("Неверный пароль");
+    res.status(401).send("Неверный пароль");
   }
 });
 
 app.post("/logout", async (req, res) => {
-  const authToken = req.cookies['AuthToken'];
+
+  const authToken = req.headers['authToken'];
+
   //Удаляем из db запись с текущем пользователем
-  await remove(db, {authToken});
-  //Удаляем токен из куков
-  delete req.cookies['AuthToken'];
-  res.status(200).send ("Пользователь успешно вышел");
+  await remove(db, { authToken });
+  //Удаляем токен из Header
+  delete req.headers['authToken'];
+  res.status(200).send("Пользователь успешно вышел");
 });
 
 const appPost = (
@@ -188,10 +190,10 @@ const isContractData = (obj: any): obj is Contract =>
   typeof obj === "object" &&
   typeof obj.code === "string" && obj.code;
 
-  //typeof obj.contactcode === "string" &&
-  //obj.contactcode &&
-  //typeof obj.datebegin === "string" &&
-  //obj.datebegin;
+//typeof obj.contactcode === "string" &&
+//obj.contactcode &&
+//typeof obj.datebegin === "string" &&
+//obj.datebegin;
 
 appPost(
   "/contracts",
@@ -204,15 +206,15 @@ const isProtocolData = (obj: any): obj is Protocol =>
   typeof obj === "object" &&
   typeof obj.code === "string" &&
   obj.code;
-  //&&
-  //typeof obj.number === "number" &&
-  //obj.number &&
-  //typeof obj.contactcode === "string" &&
-  //obj.contactcode &&
-  //typeof obj.goodcode === "string" &&
-  //obj.goodcode &&
-  //typeof obj.price === "number" &&
-  //obj.price;
+//&&
+//typeof obj.number === "number" &&
+//obj.number &&
+//typeof obj.contactcode === "string" &&
+//obj.contactcode &&
+//typeof obj.goodcode === "string" &&
+//obj.goodcode &&
+//typeof obj.price === "number" &&
+//obj.price;
 
 appPost(
   "/protocols",
@@ -294,7 +296,7 @@ const shutdown = async (msg: string) => {
 };
 
 process
-  .on('exit', code => console.log(`Process exit event with code: ${code}`) )
+  .on('exit', code => console.log(`Process exit event with code: ${code}`))
   .on('SIGINT', async () => {
     await shutdown('SIGINT received...');
     process.exit();
@@ -303,6 +305,6 @@ process
     await shutdown('SIGTERM received...');
     process.exit();
   })
-  .on('unhandledRejection', (reason, p) => console.error({ err: reason }, p) )
-  .on('uncaughtException', err => console.error(err) );
+  .on('unhandledRejection', (reason, p) => console.error({ err: reason }, p))
+  .on('uncaughtException', err => console.error(err));
 

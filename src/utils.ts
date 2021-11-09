@@ -12,13 +12,14 @@ const SALT_ROUND = 10;
 export const getHashedPassword = async (password: string): Promise<string> => {
   const salt = await bcrypt.genSalt(SALT_ROUND);
   return bcrypt.hash(password, salt);
-};
+  };
 
 // export const getHashedPassword = (password: string) => {
 //   const sha256 = crypto.createHash('sha256');
 //   const hash = sha256.update(password).digest('base64');
 //   return hash;
 // }
+
 
 export const generateAuthToken = () => {
   return crypto.randomBytes(30).toString('hex');
