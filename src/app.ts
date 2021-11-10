@@ -25,6 +25,7 @@ import {
   loadContract,
   loadProtocol,
   loadClaim,
+  loadRemains,
 } from "./sqlqueries";
 import { dbOptions } from "./config/firebird";
 import config from '../src/config/environment';
@@ -78,12 +79,12 @@ const requireAuth = async (req: any, res: Response, next: NextFunction) => {
   if (req.user) {
     next();
   } else {
-    res.status(401).send({success: false, error: { code: 401, message: "Не пройдена аутентификация"}});
+    res.status(401).send({ success: false, error: { code: 401, message: "Не пройдена аутентификация" } });
   }
 };
 
 app.get("/", requireAuth, async (req, res) => {
-  res.send({success: true});
+  res.send({ success: true });
 });
 
 app.post("/login", async (req, res) => {
@@ -94,7 +95,7 @@ app.post("/login", async (req, res) => {
   });
 
   if (!user) {
-    res.status(404).send({success: false, error: { code: 404, message: "Неверное имя пользователя"}});
+    res.status(404).send({ success: false, error: { code: 404, message: "Неверное имя пользователя" } });
     return;
   }
 
@@ -111,9 +112,9 @@ app.post("/login", async (req, res) => {
     // Установим токен авторизации в Header
     res.setHeader('authtoken', authToken)
 
-    res.status(200).send({success: true});
+    res.status(200).send({ success: true });
   } else {
-    res.status(401).send({success: false, error: { code: 401, message: "Неверный пароль"}});
+    res.status(401).send({ success: false, error: { code: 401, message: "Неверный пароль" } });
   }
 });
 
@@ -127,7 +128,7 @@ app.post("/logout", async (req, res) => {
   //Удаляем токен из Header
   delete req.headers['authtoken'];
 
-  res.status(200).send({success: true});
+  res.status(200).send({ success: true });
 });
 
 const appPost = (
@@ -150,7 +151,7 @@ const appPost = (
         try {
           await func(reqBodyObj.data, attachment, transaction);
           await transaction.commit();
-          res.status(200).send({success: true});
+          res.status(200).send({ success: true });
           success = true;
         } finally {
           if (!success) {
@@ -160,10 +161,10 @@ const appPost = (
         }
       } catch (err) {
         console.error(err);
-        res.status(500).send({success: false, error: { code: 500, message: `Firebird error: ${err}`}});
+        res.status(500).send({ success: false, error: { code: 500, message: `Firebird error: ${err}` } });
       }
     } else {
-      res.status(500).send({success: false, error: { code: 500, message: 'Invalid data'}});
+      res.status(500).send({ success: false, error: { code: 500, message: 'Invalid data' } });
     }
   });
 };
@@ -266,6 +267,19 @@ const isClaim = (obj: any): obj is Claim =>
 
 
 appPost("/claims", requireAuth, makeDataValidator(isClaim, "claim"), loadClaim);
+
+const isRemains = (obj: any): obj is Claim =>
+  typeof obj === "object" &&
+  typeof obj.code === "string" &&
+  obj.code
+  //&& typeof obj.quant === "number" &&
+  //obj.number
+  //&& typeof obj.remainsdate === "string" &&
+  //obj.remainsdate;
+
+
+appPost("/remains", requireAuth, makeDataValidator(isRemains, "remains"), loadRemains);
+
 
 app.listen(PORT, () => {
   console.log(`Server now is running on port ${PORT}`);
