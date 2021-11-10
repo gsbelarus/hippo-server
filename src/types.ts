@@ -80,3 +80,13 @@ export interface IUserRequest extends Request {
 export type AuthToken = {
   [name: string]: IUser;
 }
+
+export interface IError {
+  code: number;
+  message: string;
+}
+
+export interface IResponse {
+  success: boolean;
+  error?: IError;
+}

@@ -59,18 +59,16 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
-
 app.use(async (req: any, res: Response, next: NextFunction) => {
-
   // Получение значения из header
   const authToken = req.headers['authtoken'];
-  console.log('req.headers', authToken);
+
   // Поиск пользователя из db по токену
   const item = await findOne(db, { authToken });
+
   // Сохраняем объект пользователя в свойство user,
   // чтобы в следующих запросах разрешить доступ этому пользователю
   req.user = item?.user;
-  console.log('item?.user', item?.user);
   next();
 });
 
@@ -80,12 +78,12 @@ const requireAuth = async (req: any, res: Response, next: NextFunction) => {
   if (req.user) {
     next();
   } else {
-    res.status(401).send("Не пройдена аутентификация");
+    res.status(401).send({success: false, error: { code: 401, message: "Не пройдена аутентификация"}});
   }
 };
 
 app.get("/", requireAuth, async (req, res) => {
-  res.send("Подключение к базе данных");
+  res.send({success: true});
 });
 
 app.post("/login", async (req, res) => {
@@ -96,7 +94,7 @@ app.post("/login", async (req, res) => {
   });
 
   if (!user) {
-    res.status(404).send("Неверное имя пользователя");
+    res.status(404).send({success: false, error: { code: 404, message: "Неверное имя пользователя"}});
     return;
   }
 
@@ -111,24 +109,25 @@ app.post("/login", async (req, res) => {
     await insert(db, { authToken, user });
 
     // Установим токен авторизации в Header
-
     res.setHeader('authtoken', authToken)
 
-    res.status(200).send("Аутентификация пройдена успешно");
+    res.status(200).send({success: true});
   } else {
-    res.status(401).send("Неверный пароль");
+    res.status(401).send({success: false, error: { code: 401, message: "Неверный пароль"}});
   }
 });
 
 app.post("/logout", async (req, res) => {
 
-  const authToken = req.headers['authToken'];
+  const authToken = req.headers['authtoken'];
 
   //Удаляем из db запись с текущем пользователем
   await remove(db, { authToken });
+
   //Удаляем токен из Header
-  delete req.headers['authToken'];
-  res.status(200).send("Пользователь успешно вышел");
+  delete req.headers['authtoken'];
+
+  res.status(200).send({success: true});
 });
 
 const appPost = (
@@ -151,7 +150,7 @@ const appPost = (
         try {
           await func(reqBodyObj.data, attachment, transaction);
           await transaction.commit();
-          res.status(200).send("Ok");
+          res.status(200).send({success: true});
           success = true;
         } finally {
           if (!success) {
@@ -161,10 +160,10 @@ const appPost = (
         }
       } catch (err) {
         console.error(err);
-        res.status(500).send(`Firebird error: ${err}`);
+        res.status(500).send({success: false, error: { code: 500, message: `Firebird error: ${err}`}});
       }
     } else {
-      res.status(500).send("Invalid data");
+      res.status(500).send({success: false, error: { code: 500, message: 'Invalid data'}});
     }
   });
 };
@@ -269,7 +268,7 @@ const isClaim = (obj: any): obj is Claim =>
 appPost("/claims", requireAuth, makeDataValidator(isClaim, "claim"), loadClaim);
 
 app.listen(PORT, () => {
-  console.log(`Server now is running on port 8000`);
+  console.log(`Server now is running on port ${PORT}`);
 });
 
 // function data(data: any, attachment: Attachment) {
