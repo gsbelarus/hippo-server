@@ -32,7 +32,7 @@ export default {
 
    /**
     * Firebird database path
-    * d:\TEST.FDB
+    * d:\\TEST.FDB
     */
 
    FIREBIRD_DATABASE: 'TEST',
