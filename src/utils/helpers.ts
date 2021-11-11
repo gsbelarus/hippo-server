@@ -14,21 +14,9 @@ export const getHashedPassword = async (password: string): Promise<string> => {
   return bcrypt.hash(password, salt);
   };
 
-// export const getHashedPassword = (password: string) => {
-//   const sha256 = crypto.createHash('sha256');
-//   const hash = sha256.update(password).digest('base64');
-//   return hash;
-// }
-
-
 export const generateAuthToken = () => {
   return crypto.randomBytes(30).toString('hex');
 }
-
-// (s: string | undefined) => s && s.normalize('NFKD').replace(combining, '');
-// const combining = /[\u0300-\u036F]/g;   "NFC" | "NFD" | "NFKC" | "NFKD"
-// str.normalize('NFKD').replace(combining, '');
-
 
 /**
  *

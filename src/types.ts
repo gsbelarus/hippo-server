@@ -86,7 +86,8 @@ export interface IError {
   message: string;
 }
 
-export interface IResponse {
+export interface IResponse<T = undefined> {
   success: boolean;
   error?: IError;
+  data?: T;
 }
