@@ -29,9 +29,10 @@ import {
 } from "./sqlqueries";
 import { dbOptions } from "./config/firebird";
 import config from '../src/config/environment';
-import { generateAuthToken } from "./utils";
+import { generateAuthToken } from "./utils/helpers";
 import bcrypt from 'bcrypt';
 import { findOne, insert, remove } from "./neDb";
+import log from './utils/logger';
 
 const client = createNativeClient(getDefaultLibraryFilename());
 
@@ -62,11 +63,9 @@ app.use(cookieParser());
 
 app.use(async (req: any, res: Response, next: NextFunction) => {
   // Получение значения из header
-  const authToken = req.headers['authtoken'];
-
+  const authToken = req.headers['authorization'];
   // Поиск пользователя из db по токену
   const item = await findOne(db, { authToken });
-
   // Сохраняем объект пользователя в свойство user,
   // чтобы в следующих запросах разрешить доступ этому пользователю
   req.user = item?.user;
@@ -79,7 +78,8 @@ const requireAuth = async (req: any, res: Response, next: NextFunction) => {
   if (req.user) {
     next();
   } else {
-    res.status(401).send({ success: false, error: { code: 401, message: "Не пройдена аутентификация" } });
+    log.warn('requireAuth: Не пройдена авторизация');
+    res.status(401).send({success: false, error: { code: 401, message: "Не пройдена авторизация"}});
   }
 };
 
@@ -87,48 +87,44 @@ app.get("/", requireAuth, async (req, res) => {
   res.send({ success: true });
 });
 
+// app.post("/test", async (req, res) => {
+//   console.log('body11', (req.body as any)[0].line);
+//   res.send({success: true});
+// });
+
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
-
   const user = users.find(u => {
     return username === u.name
   });
-
   if (!user) {
-    res.status(404).send({ success: false, error: { code: 404, message: "Неверное имя пользователя" } });
+    log.warn('/login: Неверное имя пользователя');
+    res.status(404).send({success: false, error: { code: 404, message: "Неверное имя пользователя"}});
     return;
   }
-
   const hashedPassword = user.password;
-
   //Сравним пришедший пароль с тем, который хранится у нас
   if (await bcrypt.compare(password, hashedPassword)) {
     //Сгенерируем новый токен
     const authToken = generateAuthToken();
-
     //Сохраним новый токен в bd для вошедшего пользователя
     await insert(db, { authToken, user });
-
-    // Установим токен авторизации в Header
-    res.setHeader('authtoken', authToken)
-
-    res.status(200).send({ success: true });
+    log.info('/login: Аутентификация успешно пройдена');
+    res.status(200).send({success: true, data: { access_token: authToken }});
   } else {
-    res.status(401).send({ success: false, error: { code: 401, message: "Неверный пароль" } });
+    log.warn('/login: Неверный пароль');
+    res.status(401).send({success: false, error: { code: 401, message: "Неверный пароль"}});
   }
 });
 
-app.post("/logout", async (req, res) => {
-
-  const authToken = req.headers['authtoken'];
-
+app.post("/logout", requireAuth, async (req, res) => {
+  const authToken = req.headers['authorization'];
   //Удаляем из db запись с текущем пользователем
   await remove(db, { authToken });
-
-  //Удаляем токен из Header
-  delete req.headers['authtoken'];
-
-  res.status(200).send({ success: true });
+  // //Удаляем токен из Header
+  // delete req.headers['Authorization'];
+  log.info('/logout: Выход из учетной записи выполнен успешно');
+  res.status(200).send({success: true});
 });
 
 const appPost = (
@@ -143,6 +139,7 @@ const appPost = (
 ) => {
   app.post(endPoint, authMiddleware, async (req: Request, res: Response) => {
     const reqBodyObj = req.body;
+    log.info(`${endPoint} Начала загрузки данных`);
     if (validator(reqBodyObj)) {
       try {
         const attachment = await attach();
@@ -151,7 +148,8 @@ const appPost = (
         try {
           await func(reqBodyObj.data, attachment, transaction);
           await transaction.commit();
-          res.status(200).send({ success: true });
+          res.status(200).send({success: true});
+          log.info(`${endPoint} Окончание загрузки данных`);
           success = true;
         } finally {
           if (!success) {
@@ -160,11 +158,13 @@ const appPost = (
           await attachment.disconnect();
         }
       } catch (err) {
-        console.error(err);
-        res.status(500).send({ success: false, error: { code: 500, message: `Firebird error: ${err}` } });
+        // console.error(err);
+        log.error(`${endPoint} Ошибка Firebird - ${err}`);
+        res.status(500).send({success: false, error: { code: 500, message: `Ошибка Firebird: ${err}`}});
       }
     } else {
-      res.status(500).send({ success: false, error: { code: 500, message: 'Invalid data' } });
+      log.error(`${endPoint} Неверный формат данных`);
+      res.status(500).send({success: false, error: { code: 500, message: 'Неверный формат данных'}});
     }
   });
 };
@@ -265,7 +265,6 @@ const isClaim = (obj: any): obj is Claim =>
   && typeof obj.docdate === "string" &&
   obj.docdate;
 
-
 appPost("/claims", requireAuth, makeDataValidator(isClaim, "claim"), loadClaim);
 
 const isRemains = (obj: any): obj is Claim =>
@@ -282,7 +281,8 @@ appPost("/remains", requireAuth, makeDataValidator(isRemains, "remains"), loadRe
 
 
 app.listen(PORT, () => {
-  console.log(`Server now is running on port ${PORT}`);
+  log.info(`Server is running on port ${PORT}`);
+  // console.log(`Server now is running on port ${PORT}`);
 });
 
 // function data(data: any, attachment: Attachment) {
@@ -306,11 +306,14 @@ app.listen(PORT, () => {
 
 const shutdown = async (msg: string) => {
   await remove(db, {});
+  log.info(`shutdown: Все данные по пользователям очищены`)
 };
 
 process
-  .on('exit', code => console.log(`Process exit event with code: ${code}`))
+  .on('exit', code => log.info(`Process exit event with code: ${code}`))
   .on('SIGINT', async () => {
+    log.info('Ctrl-C...');
+    log.info('Finished all requests');
     await shutdown('SIGINT received...');
     process.exit();
   })

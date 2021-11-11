@@ -2,7 +2,7 @@ import { Attachment, Transaction } from "node-firebird-driver";
 import { execPath } from "process";
 import { Contact } from "../types";
 import iconv from "iconv-lite";
-import { convertingToASCII } from "../utils";
+import { convertingToASCII } from "../utils/helpers";
 
 const eb = ` EXECUTE BLOCK (CODE VARCHAR(50) = ?, NAME VARCHAR(200) = ?, ADDRESS VARCHAR(180) = ?, PHONE VARCHAR(80) = ?, EMAIL VARCHAR(400) = ?, GLN VARCHAR(13) = ?, TAXID VARCHAR(9) = ?)
   AS
@@ -30,7 +30,7 @@ const eb = ` EXECUTE BLOCK (CODE VARCHAR(50) = ?, NAME VARCHAR(200) = ?, ADDRESS
       INTO :ID;
       INSERT INTO gd_contact (ID, CONTACTTYPE, PARENT, USR$LSF_CODE, NAME, ADDRESS, PHONE, EMAIL, USR$ETTN_GLN) VALUES (:ID, 3, :PARENT, :CODE, :SHORTNAME, :ADDRESS, :PHONE, :EMAIL, :GLN);
       INSERT INTO GD_COMPANY (CONTACTKEY, FULLNAME) VALUES (:ID, :NAME);
-      INSERT INTO GD_COMPANYCODE (COMPANYKEY, TAXID) VALUES (:ID, :TAXID); 
+      INSERT INTO GD_COMPANYCODE (COMPANYKEY, TAXID) VALUES (:ID, :TAXID);
     END
     ELSE
     BEGIN
@@ -46,6 +46,6 @@ const eb = ` EXECUTE BLOCK (CODE VARCHAR(50) = ?, NAME VARCHAR(200) = ?, ADDRESS
       await st.execute(transaction, [rec.code, convertingToASCII (rec.name), convertingToASCII (rec.address), rec.phone, convertingToASCII (rec.email), rec.gln, rec.taxid]);
     }
   };
-  
+
 
 
