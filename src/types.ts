@@ -1,3 +1,4 @@
+import { time } from "console";
 import { Request } from "express"
 
 export interface DataObject<K = string> {
@@ -39,7 +40,7 @@ export interface Good {
 }
 
 export interface Contract {
-  code:string;
+  code: string;
   number: string;
   contactcode: string;
   datebegin: Date;
@@ -47,14 +48,14 @@ export interface Contract {
 }
 
 export interface Protocol {
-  code?:string;
+  code?: string;
   number: string;
   contractcode: string;
-  contactcode:string;
+  contactcode: string;
   datebegin: Date;
   dateend: Date;
   goodcode: string;
-  price:number;
+  price: number;
   endprice: number;
 }
 
@@ -66,6 +67,14 @@ export interface Claim {
   stringnumber: number;
   goodcode: string;
   quant: number;
+}
+
+export interface Remains {
+  code?: string;
+  quant: number;
+  remainsdate: string;
+  makedate: string;
+  maketime: string;
 }
 
 export interface IUser {

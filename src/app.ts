@@ -25,6 +25,7 @@ import {
   loadContract,
   loadProtocol,
   loadClaim,
+  loadRemains,
 } from "./sqlqueries";
 import { dbOptions } from "./config/firebird";
 import config from '../src/config/environment';
@@ -83,7 +84,7 @@ const requireAuth = async (req: any, res: Response, next: NextFunction) => {
 };
 
 app.get("/", requireAuth, async (req, res) => {
-  res.send({success: true});
+  res.send({ success: true });
 });
 
 // app.post("/test", async (req, res) => {
@@ -265,6 +266,19 @@ const isClaim = (obj: any): obj is Claim =>
   obj.docdate;
 
 appPost("/claims", requireAuth, makeDataValidator(isClaim, "claim"), loadClaim);
+
+const isRemains = (obj: any): obj is Claim =>
+  typeof obj === "object" &&
+  typeof obj.code === "string" &&
+  obj.code
+  //&& typeof obj.quant === "number" &&
+  //obj.number
+  //&& typeof obj.remainsdate === "string" &&
+  //obj.remainsdate;
+
+
+appPost("/remains", requireAuth, makeDataValidator(isRemains, "remains"), loadRemains);
+
 
 app.listen(PORT, () => {
   log.info(`Server is running on port ${PORT}`);
