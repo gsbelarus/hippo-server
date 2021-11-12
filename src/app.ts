@@ -87,10 +87,20 @@ app.get("/", requireAuth, async (req, res) => {
   res.send({ success: true });
 });
 
-// app.post("/test", async (req, res) => {
-//   console.log('body11', (req.body as any)[0].line);
-//   res.send({success: true});
-// });
+app.post("/log", async (req, res) => {
+  console.log('exec', req.body, req.params);
+  res.send({success: true, token: '123456789'});
+});
+
+app.post("/exec", async (req, res) => {
+  console.log('order', req.query, req.body.length);
+  res.send({success: true});
+});
+
+app.post("/sellbill", async (req, res) => {
+  console.log('order', req.params);
+  res.send({success: true});
+});
 
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
@@ -146,7 +156,7 @@ const appPost = (
         const transaction = await attachment.startTransaction();
         let success = false;
         try {
-          await func(reqBodyObj.data, attachment, transaction);
+          await func(reqBodyObj, attachment, transaction);
           await transaction.commit();
           res.status(200).send({success: true});
           log.info(`${endPoint} Окончание загрузки данных`);
@@ -170,12 +180,12 @@ const appPost = (
 };
 
 const makeDataValidator =
-  (itemValidator: any, name: string) => (reqBodyObj: any) =>
+  (itemValidator: any) => (reqBodyObj: any) =>
     typeof reqBodyObj === "object" &&
-    reqBodyObj.name === name &&
-    Array.isArray(reqBodyObj.data) &&
-    !!reqBodyObj.data.length &&
-    itemValidator(reqBodyObj.data[0]);
+    // reqBodyObj.name === name &&
+    Array.isArray(reqBodyObj) &&
+    !!reqBodyObj.length &&
+    itemValidator(reqBodyObj[0]);
 
 const isValueData = (obj: any): obj is Value =>
   typeof obj === "object" &&
@@ -184,7 +194,7 @@ const isValueData = (obj: any): obj is Value =>
   typeof obj.code === "string" &&
   obj.code;
 
-appPost("/values", requireAuth, makeDataValidator(isValueData, "value"), loadValue);
+appPost("/values", requireAuth, makeDataValidator(isValueData), loadValue);
 
 const isContractData = (obj: any): obj is Contract =>
   typeof obj === "object" &&
@@ -198,7 +208,7 @@ const isContractData = (obj: any): obj is Contract =>
 appPost(
   "/contracts",
   requireAuth,
-  makeDataValidator(isContractData, "contract"),
+  makeDataValidator(isContractData),
   loadContract
 );
 
@@ -219,7 +229,7 @@ const isProtocolData = (obj: any): obj is Protocol =>
 appPost(
   "/protocols",
   requireAuth,
-  makeDataValidator(isProtocolData, "protocol"),
+  makeDataValidator(isProtocolData),
   loadProtocol
 );
 
@@ -230,7 +240,7 @@ const isContactData = (obj: any): obj is Contact =>
   typeof obj.code === "string" &&
   obj.code;
 
-appPost("/contacts", requireAuth, makeDataValidator(isContactData, "contact"), loadContact);
+appPost("/contacts", requireAuth, makeDataValidator(isContactData), loadContact);
 
 const isGoodData = (obj: any): obj is Good =>
   typeof obj === "object" &&
@@ -241,7 +251,7 @@ const isGoodData = (obj: any): obj is Good =>
   typeof obj.groupcode === "string" &&
   obj.groupcode;
 
-appPost("/goods", requireAuth, makeDataValidator(isGoodData, "good"), loadGood);
+appPost("/goods", requireAuth, makeDataValidator(isGoodData), loadGood);
 
 const isGoodgroupData = (obj: any): obj is Goodgroup =>
   typeof obj === "object" &&
@@ -253,7 +263,7 @@ const isGoodgroupData = (obj: any): obj is Goodgroup =>
 appPost(
   "/goodgroups",
   requireAuth,
-  makeDataValidator(isGoodgroupData, "goodgroup"),
+  makeDataValidator(isGoodgroupData),
   loadGoodgroup
 );
 const isClaim = (obj: any): obj is Claim =>
@@ -265,7 +275,7 @@ const isClaim = (obj: any): obj is Claim =>
   && typeof obj.docdate === "string" &&
   obj.docdate;
 
-appPost("/claims", requireAuth, makeDataValidator(isClaim, "claim"), loadClaim);
+appPost("/claims", requireAuth, makeDataValidator(isClaim), loadClaim);
 
 const isRemains = (obj: any): obj is Claim =>
   typeof obj === "object" &&
@@ -277,7 +287,7 @@ const isRemains = (obj: any): obj is Claim =>
   //obj.remainsdate;
 
 
-appPost("/remains", requireAuth, makeDataValidator(isRemains, "remains"), loadRemains);
+appPost("/remains", requireAuth, makeDataValidator(isRemains), loadRemains);
 
 
 app.listen(PORT, () => {
