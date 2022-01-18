@@ -1,6 +1,6 @@
 import { Attachment, Transaction } from "node-firebird-driver";
-//import { execPath } from "process";
 import { Contract } from "../types";
+import { convertingToASCII, str2date } from "../utils/helpers";
 
 const eb = `/* contract */
 EXECUTE BLOCK (CODE VARCHAR(50) = ?, NUMBER VARCHAR(50) = ?, CONTACTCODE VARCHAR(50) = ?, DATEBEGIN DATE = ?, DATEEND DATE = ?)
@@ -34,8 +34,8 @@ BEGIN
   END
   ELSE
   BEGIN
-    UPDATE GD_DOCUMENT SET NUMBER = LEFT(:NUMBER, 20), DOCUMENTDATE = :DATEBEGIN WHERE ID = :ID;
-    UPDATE USR$INV_CONTRACT SET USR$CONTACTKEY = :CONID, USR$DATEEND = :DATEEND WHERE DOCUMENTKEY = :ID;
+    UPDATE GD_DOCUMENT SET NUMBER = LEFT(:NUMBER, 20), DOCUMENTDATE = :DATEBEGIN, EDITIONDATE = CURRENT_TIMESTAMP  WHERE ID = :ID;
+    UPDATE USR$INV_CONTRACT SET USR$CONTACTKEY = :CONID, USR$DATEEND = :DATEEND WHERE DOCUMENTKEY = :ID;  
   END
 END
 `;
@@ -43,10 +43,25 @@ END
 export const loadContract = async (data: Contract[], attachment: Attachment, transaction: Transaction) => {
   const st = await attachment.prepare(transaction, eb);
   for (const rec of data) {
-    console.log(rec);
+   
+    console.log("contract", rec);
+    const DB = str2date(rec.datebegin);//rec.datebegin ? new Date (rec.datebegin) : new Date();
+    const DE = rec.dateend ? str2date(rec.dateend) : null;
+
     await st.execute(transaction, 
-      [rec.code, rec.number || 'б/н', rec.contactcode, rec.datebegin ? new Date (rec.datebegin) : new Date(), rec.dateend && new Date (rec.dateend)]);
+      [convertingToASCII(rec.code), convertingToASCII(rec.number) || 'б/н', convertingToASCII(rec.contactcode), DB, DE]);
   }
 };
 
-
+export const isContractData = (obj: any): obj is Contract =>
+  typeof obj === "object" &&
+  typeof obj.code === "string" &&
+  obj.code &&
+  typeof obj.number === "string" &&
+  obj.number &&
+  typeof obj.contactcode === "string" &&
+  obj.contactcode &&
+  typeof obj.datebegin === "string" &&
+  str2date(obj.datebegin);
+  
+  

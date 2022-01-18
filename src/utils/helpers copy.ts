@@ -14,6 +14,8 @@ const win1251 = new Uint8Array([...temp, 168, 184, 161, 162, 178, 179, 138, 142,
 const decoder = new TextDecoder('windows-1251');
 const cyrillicLetters = decoder.decode(win1251).normalize('NFC');
 
+console.log(cyrillicLetters);
+
 //const cyrillicLetters = 'абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ';
 
 export const forceWin1251 = (s: string | undefined) => {
@@ -24,6 +26,7 @@ export const forceWin1251 = (s: string | undefined) => {
   return s.split('')
     .map( ch => {
       const c = ch.charCodeAt(0);
+      console.log(ch, c, cyrillicLetters.indexOf(ch));
       return (c > 128 && cyrillicLetters.indexOf(ch) === -1) ? '_' : ch;
      })
      .join('');

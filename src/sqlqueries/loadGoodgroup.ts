@@ -1,6 +1,6 @@
 import { Attachment, Transaction } from "node-firebird-driver";
-import { execPath } from "process";
 import { Goodgroup } from "../types";
+import { convertingToASCII } from "../utils/helpers";
 
 const eb = ` /* товарные группы */
     EXECUTE BLOCK (CODE VARCHAR(50) = ?, NAME VARCHAR(80) = ?, PARENTCODE VARCHAR(50) = ?)
@@ -18,7 +18,7 @@ const eb = ` /* товарные группы */
       END
       ELSE
       BEGIN
-        SELECT ID
+        SELECT FIRST 1 ID
         FROM GD_GOODGROUP
         WHERE USR$LSF_CODE = :PARENTCODE
         INTO :PARENT;
@@ -40,14 +40,21 @@ const eb = ` /* товарные группы */
       END
       ELSE
       BEGIN
-        UPDATE GD_GOODGROUP SET NAME = :NAME, PARENT = :PARENT WHERE ID = :ID;
+        UPDATE GD_GOODGROUP SET NAME = :NAME, PARENT = :PARENT, EDITIONDATE = CURRENT_TIMESTAMP WHERE ID = :ID;
       END
     END`;
 
     export const loadGoodgroup = async (data: Goodgroup[], attachment: Attachment, transaction: Transaction) => {
       const st = await attachment.prepare(transaction, eb);
       for (const rec of data) {
-        await st.execute(transaction, [rec.code, rec.name, rec.parentcode]);
+        console.log("goodgroup", rec);
+        await st.execute(transaction, [rec.code, convertingToASCII (rec.name), rec.parentcode]);
       }
     };
-  
+
+export const isGoodgroupData = (obj: any): obj is Goodgroup =>
+  typeof obj === "object" &&
+  typeof obj.name === "string" &&
+  obj.name &&
+  typeof obj.code === "string" &&
+  obj.code;

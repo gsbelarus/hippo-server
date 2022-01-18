@@ -9,12 +9,11 @@ export interface DataObject<K = string> {
 export interface Contact {
   code: string;
   name: string;
-  address: string;
-  phone: string;
-  email: string;
-  gln: string;
   taxid: string;
-
+  address?: string;
+  phone?: string;
+  email?: string;
+  gln?: string;
 }
 
 export interface Value {
@@ -29,52 +28,51 @@ export interface Goodgroup {
 }
 export interface Good {
   code: string;
-  rate: number;
   name: string;
-  weight: number;
-  disabled: number;
-  barcode: string;
   valuecode: string;
   groupcode: string;
-  moq: number;
+  disabled?: number;
+  rate?: number;  
+  moq?: number;
+  weight?: number;
+  barcode?: string;
 }
 
 export interface Contract {
   code: string;
   number: string;
   contactcode: string;
-  datebegin: Date;
-  dateend: Date;
+  datebegin: string;
+  dateend?: string;
 }
 
 export interface Protocol {
-  code?: string;
+  code: string;
   number: string;
   contractcode: string;
   contactcode: string;
-  datebegin: Date;
-  dateend: Date;
+  datebegin: string;
+  dateend?: string;
   goodcode: string;
   price: number;
   endprice: number;
 }
 
 export interface Claim {
-  code?: string;
   number: string;
-  docdate: Date;
-  orderdate: Date;
+  docdate: string;
+  orderdate: string;
   stringnumber: number;
   goodcode: string;
   quant: number;
 }
 
 export interface Remains {
-  code?: string;
+  code: string;
   quant: number;
   remainsdate: string;
-  makedate: string;
-  maketime: string;
+  makedate?: string;
+  maketime?: string;
 }
 
 export interface IUser {

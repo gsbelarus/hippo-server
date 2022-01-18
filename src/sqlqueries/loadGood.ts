@@ -1,5 +1,6 @@
 import { Attachment, Transaction } from "node-firebird-driver";
 import { Good } from "../types";
+import { convertingToASCII } from "../utils/helpers";
 
 const eb = `/* товары */
   EXECUTE BLOCK (
@@ -65,7 +66,7 @@ const eb = `/* товары */
         USR$MOQ = CAST(:MOQ AS DECIMAL(15,4)), 
         DISABLED = :DISABLED,
         DESCRIPTION = :DESCR,
-        EDITIONDATE = CAST('NOW' as date) 
+        EDITIONDATE = CURRENT_TIMESTAMP 
         WHERE ID = :ID;
        
       UPDATE gd_goodtax SET RATE = :RATE WHERE GOODKEY = :ID and TAXKEY = :TAXKEY;
@@ -76,10 +77,22 @@ const eb = `/* товары */
 export const loadGood = async (data: Good[], attachment: Attachment, transaction: Transaction) => {
   const st = await attachment.prepare(transaction, eb);
   for (const rec of data) {
-    await st.execute(transaction, [rec.code, rec.rate, rec.name, rec.weight,
+    const n = convertingToASCII(rec.name);
+    console.log("name", n);
+    console.log("good", rec);
+    await st.execute(transaction, [rec.code, rec.rate, n, rec.weight,
       rec.disabled, rec.barcode, rec.valuecode, rec.groupcode, rec.moq]);
   }
 };
-
+export const isGoodData = (obj: any): obj is Good =>
+  typeof obj === "object" &&
+  typeof obj.code === "string" &&
+  obj.code &&
+  typeof obj.name === "string" &&
+  obj.name &&
+  typeof obj.groupcode === "string" &&
+  obj.groupcode &&
+  typeof obj.valuecode === "string" &&
+  obj.valuecode;
 
   

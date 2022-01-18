@@ -1,5 +1,4 @@
 import express, { NextFunction, Response, Request } from "express";
-import cookieParser from "cookie-parser";
 import Datastore from 'nedb';
 import {
   Attachment,
@@ -33,10 +32,18 @@ import { generateAuthToken } from "./utils/helpers";
 import bcrypt from 'bcrypt';
 import { findOne, insert, remove } from "./neDb";
 import log from './utils/logger';
+import { isContractData } from "./sqlqueries/loadContract";
+import { isContactData } from "./sqlqueries/loadContact";
+import { isProtocolData } from "./sqlqueries/loadProtocol";
+import { isGoodData } from "./sqlqueries/loadGood";
+import { isGoodgroupData } from "./sqlqueries/loadGoodgroup";
+import { isClaimData } from "./sqlqueries/loadClaim";
+import { isRemainsData } from "./sqlqueries/loadRemains";
+import { isValueData } from "./sqlqueries/loadValue";
 
 const client = createNativeClient(getDefaultLibraryFilename());
 
-const db = new Datastore();
+const db = new Datastore({filename : 'users'});
 db.loadDatabase();
 
 const user: IUser = {
@@ -59,7 +66,6 @@ const app = express();
 const PORT = 8000;
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-app.use(cookieParser());
 
 app.use(async (req: any, res: Response, next: NextFunction) => {
   // Получение значения из header
@@ -137,10 +143,18 @@ app.post("/logout", requireAuth, async (req, res) => {
   res.status(200).send({success: true});
 });
 
+/**
+ * 
+ * @param endPoint 
+ * @param authMiddleware 
+ * @param validator Функция принимает на вход входящие данные и проверяет, чтобы они были массивом и каждый элемент в массиве удовлетворял заданной функции проверки.
+ *                  Если даные не соответствуют заданному критерию, то будет сгенерировано исключение. 
+ * @param func 
+ */
 const appPost = (
   endPoint: string,
   authMiddleware: (req: Request, res: Response, next: NextFunction) => Promise<void>,
-  validator: (dataObj: any) => boolean,
+  validator: (dataObj: any) => void,
   func: (
     dataObj: any,
     attachment: Attachment,
@@ -150,7 +164,8 @@ const appPost = (
   app.post(endPoint, authMiddleware, async (req: Request, res: Response) => {
     const reqBodyObj = req.body;
     log.info(`${endPoint} Начала загрузки данных`);
-    if (validator(reqBodyObj)) {
+    try {
+      validator(reqBodyObj);
       try {
         const attachment = await attach();
         const transaction = await attachment.startTransaction();
@@ -168,42 +183,29 @@ const appPost = (
           await attachment.disconnect();
         }
       } catch (err) {
-        // console.error(err);
         log.error(`${endPoint} Ошибка Firebird - ${err}`);
         res.status(500).send({success: false, error: { code: 500, message: `Ошибка Firebird: ${err}`}});
       }
-    } else {
+    } catch(err) {
       log.error(`${endPoint} Неверный формат данных`);
       res.status(500).send({success: false, error: { code: 500, message: 'Неверный формат данных'}});
     }
   });
 };
 
-const makeDataValidator =
-  (itemValidator: any) => (reqBodyObj: any) =>
-    typeof reqBodyObj === "object" &&
-    // reqBodyObj.name === name &&
-    Array.isArray(reqBodyObj) &&
-    !!reqBodyObj.length &&
-    itemValidator(reqBodyObj[0]);
+const makeDataValidator = (itemValidator: any) => (reqBodyObj: any) => {
+  if (!Array.isArray(reqBodyObj) || !reqBodyObj.length) {
+    throw new Error('Входящие данные должны быть не пустым массивом');
+  }
 
-const isValueData = (obj: any): obj is Value =>
-  typeof obj === "object" &&
-  typeof obj.name === "string" &&
-  obj.name &&
-  typeof obj.code === "string" &&
-  obj.code;
+  for (const rec of reqBodyObj) {    
+    if (!itemValidator(rec)) {
+      throw new Error(`Неверный формат данных ${JSON.stringify(rec)}`);
+    }
+  }       
+};
 
 appPost("/values", requireAuth, makeDataValidator(isValueData), loadValue);
-
-const isContractData = (obj: any): obj is Contract =>
-  typeof obj === "object" &&
-  typeof obj.code === "string" && obj.code;
-
-//typeof obj.contactcode === "string" &&
-//obj.contactcode &&
-//typeof obj.datebegin === "string" &&
-//obj.datebegin;
 
 appPost(
   "/contracts",
@@ -212,20 +214,6 @@ appPost(
   loadContract
 );
 
-const isProtocolData = (obj: any): obj is Protocol =>
-  typeof obj === "object" &&
-  typeof obj.code === "string" &&
-  obj.code;
-//&&
-//typeof obj.number === "number" &&
-//obj.number &&
-//typeof obj.contactcode === "string" &&
-//obj.contactcode &&
-//typeof obj.goodcode === "string" &&
-//obj.goodcode &&
-//typeof obj.price === "number" &&
-//obj.price;
-
 appPost(
   "/protocols",
   requireAuth,
@@ -233,61 +221,18 @@ appPost(
   loadProtocol
 );
 
-const isContactData = (obj: any): obj is Contact =>
-  typeof obj === "object" &&
-  typeof obj.name === "string" &&
-  obj.name &&
-  typeof obj.code === "string" &&
-  obj.code;
-
 appPost("/contacts", requireAuth, makeDataValidator(isContactData), loadContact);
 
-const isGoodData = (obj: any): obj is Good =>
-  typeof obj === "object" &&
-  typeof obj.name === "string" &&
-  obj.name &&
-  typeof obj.code === "string" &&
-  obj.code &&
-  typeof obj.groupcode === "string" &&
-  obj.groupcode;
 
 appPost("/goods", requireAuth, makeDataValidator(isGoodData), loadGood);
 
-const isGoodgroupData = (obj: any): obj is Goodgroup =>
-  typeof obj === "object" &&
-  typeof obj.name === "string" &&
-  obj.name &&
-  typeof obj.code === "string" &&
-  obj.code;
-
 appPost(
-  "/goodgroups",
-  requireAuth,
-  makeDataValidator(isGoodgroupData),
-  loadGoodgroup
-);
-const isClaim = (obj: any): obj is Claim =>
-  typeof obj === "object" &&
-  typeof obj.goodcode === "string" &&
-  obj.goodcode
-  && typeof obj.number === "string" &&
-  obj.number
-  && typeof obj.docdate === "string" &&
-  obj.docdate;
+  "/goodgroups", requireAuth, makeDataValidator(isGoodgroupData), loadGoodgroup);
 
-appPost("/claims", requireAuth, makeDataValidator(isClaim), loadClaim);
-
-const isRemains = (obj: any): obj is Claim =>
-  typeof obj === "object" &&
-  typeof obj.code === "string" &&
-  obj.code
-  //&& typeof obj.quant === "number" &&
-  //obj.number
-  //&& typeof obj.remainsdate === "string" &&
-  //obj.remainsdate;
+appPost("/claims", requireAuth, makeDataValidator(isClaimData), loadClaim);
 
 
-appPost("/remains", requireAuth, makeDataValidator(isRemains), loadRemains);
+appPost("/remains", requireAuth, makeDataValidator(isRemainsData), loadRemains);
 
 
 app.listen(PORT, () => {
@@ -315,7 +260,7 @@ app.listen(PORT, () => {
  */
 
 const shutdown = async (msg: string) => {
-  await remove(db, {});
+  //await remove(db, {});
   log.info(`shutdown: Все данные по пользователям очищены`)
 };
 

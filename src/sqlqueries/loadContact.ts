@@ -1,7 +1,5 @@
 import { Attachment, Transaction } from "node-firebird-driver";
-import { execPath } from "process";
 import { Contact } from "../types";
-import iconv from "iconv-lite";
 import { convertingToASCII } from "../utils/helpers";
 
 const eb = ` EXECUTE BLOCK (CODE VARCHAR(50) = ?, NAME VARCHAR(200) = ?, ADDRESS VARCHAR(180) = ?, PHONE VARCHAR(80) = ?, EMAIL VARCHAR(400) = ?, GLN VARCHAR(13) = ?, TAXID VARCHAR(9) = ?)
@@ -34,18 +32,29 @@ const eb = ` EXECUTE BLOCK (CODE VARCHAR(50) = ?, NAME VARCHAR(200) = ?, ADDRESS
     END
     ELSE
     BEGIN
-      UPDATE gd_contact SET NAME = :NAME, ADDRESS = :ADDRESS, PHONE = :PHONE, EMAIL = :EMAIL, USR$ETTN_GLN = :GLN WHERE ID = :ID;
+      UPDATE gd_contact SET NAME = :SHORTNAME, ADDRESS = :ADDRESS, PHONE = :PHONE, EMAIL =  :EMAIL, USR$ETTN_GLN = :GLN, EDITIONDATE = CURRENT_TIMESTAMP WHERE ID = :ID;
       UPDATE GD_COMPANY SET FULLNAME = :NAME WHERE CONTACTKEY = :ID;
       UPDATE GD_COMPANYCODE SET TAXID = :TAXID WHERE COMPANYKEY = :ID;
     END
   END`;
 
   export const loadContact = async (data: Contact[], attachment: Attachment, transaction: Transaction) => {
+    console.log('loadContact', 111);
     const st = await attachment.prepare(transaction, eb);
     for (const rec of data) {
-      await st.execute(transaction, [rec.code, convertingToASCII (rec.name), convertingToASCII (rec.address), rec.phone, convertingToASCII (rec.email), rec.gln, rec.taxid]);
+      console.log("contact", rec);
+      await st.execute(transaction, [rec.code, convertingToASCII(rec.name), convertingToASCII(rec.address), rec.phone, convertingToASCII(rec.email), rec.gln, rec.taxid]);
     }
   };
 
+  export const isContactData = (obj: any): obj is Contact =>
+  typeof obj === "object" &&
+  typeof obj.code === "string" &&
+  obj.code &&
+  typeof obj.name === "string" &&
+  obj.name &&
+  typeof obj.taxid === "string" &&
+  obj.taxid;
 
+  
 

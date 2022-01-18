@@ -1,6 +1,6 @@
 import { Attachment, Transaction } from "node-firebird-driver";
 import { Protocol } from "../types";
-//import { execPath } from "process";
+import { convertingToASCII, str2date } from "../utils/helpers";
 
 const eb = `/* protocol*/
 EXECUTE BLOCK (CODE VARCHAR(50) = ?, NUMBER VARCHAR(50) = ?, CONTRACTCODE VARCHAR(50) = ?, CONTACTCODE VARCHAR(50) = ?, DATEBEGIN DATE = ?, DATEEND DATE = ?, GOODCODE VARCHAR(50) = ?, PRICE DOUBLE PRECISION = ?, ENDPRICE DOUBLE PRECISION = ?)
@@ -48,7 +48,7 @@ BEGIN
 
   IF (GOODID IS NULL) THEN
   BEGIN
-    INSERT INTO GD_GOOD (USR$LSF_CODE, NAME, GROUPKEY, VALUEKEY, CREATORKEY, CREATIONDATE, EDITORKEY, EDITIONDATE) VALUES (:GOODCODE, 'Íåèçâåñòíûé òîâàð', :GROUPKEY, 3000001, 650002, current_timestamp, 650002, current_timestamp) RETURNING ID INTO :GOODID;
+    INSERT INTO GD_GOOD (USR$LSF_CODE, NAME, GROUPKEY, VALUEKEY, CREATORKEY, CREATIONDATE, EDITORKEY, EDITIONDATE) VALUES (:GOODCODE, 'Неизвестный товар', :GROUPKEY, 3000001, 650002, current_timestamp, 650002, current_timestamp) RETURNING ID INTO :GOODID;
   END
 
   select p.id
@@ -72,7 +72,7 @@ BEGIN
     AND GOODKEY = :GOODID
     INTO :LID;
 
-    UPDATE GD_DOCUMENT SET NUMBER = :NUMBER, DOCUMENTDATE = :DATEBEGIN WHERE ID = :PRICEID;
+    UPDATE GD_DOCUMENT SET NUMBER = :NUMBER, DOCUMENTDATE = :DATEBEGIN, EDITIONDATE = CURRENT_TIMESTAMP WHERE ID = :PRICEID;
     UPDATE INV_PRICE SET USR$CONTACTKEY = :CONID, USR$CONTRACTKEY = :CONTRID, RELEVANCEDATE = :DATEEND WHERE DOCUMENTKEY = :PRICEID;
 
     IF (LID IS NULL) THEN
@@ -89,14 +89,40 @@ BEGIN
 END`;
 
 export const loadProtocol = async (data: Protocol[], attachment: Attachment, transaction: Transaction) => {
-  console.log('loadProtocol');
+  console.log('loadProtocol', 1);
   const st = await attachment.prepare(transaction, eb);
-
   for (const rec of data) {
-    const DB = rec.datebegin ? new Date (rec.datebegin) : new Date();
-    await st.execute(transaction, [rec.code, rec.number, rec.contractcode,
-      rec.contactcode, DB, rec.dateend ? new Date (rec.dateend) : DB, rec.goodcode, rec.price, rec.endprice]);
+    console.log("protocol", rec);
+    
+    const DB = str2date(rec.datebegin);//rec.datebegin ? new Date (rec.datebegin) : new Date();
+    let DE;
+    if (rec.dateend) {
+      DE = str2date(rec.dateend);    
+    } else {
+      DE = new Date(DB);
+      DE.setFullYear(DE.getFullYear() + 1);
+    }  
+  
+    await st.execute(transaction, [convertingToASCII(rec.code), convertingToASCII(rec.number), convertingToASCII(rec.contractcode),
+      convertingToASCII(rec.contactcode), DB, DE, convertingToASCII(rec.goodcode), (rec.price), (rec.endprice)]);
   }
 };
 
+export const isProtocolData = (obj: any): obj is Protocol =>
+  typeof obj === "object" &&
+  typeof obj.code === "string" &&
+  obj.code && 
+  typeof obj.number === "string" &&
+  obj.number &&
+  typeof obj.contactcode === "string" &&
+  obj.contactcode &&
+  typeof obj.datebegin === "string" && 
+  str2date(obj.datebegin) &&
+  typeof obj.goodcode === "string" &&
+  obj.goodcode &&
+  typeof obj.price === "number" &&
+  obj.price >= 0;
+
+
+//var date  = new Date(year + 1, month, day);
 
