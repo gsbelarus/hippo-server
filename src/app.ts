@@ -144,12 +144,12 @@ app.post("/logout", requireAuth, async (req, res) => {
 });
 
 /**
- * 
- * @param endPoint 
- * @param authMiddleware 
+ *
+ * @param endPoint
+ * @param authMiddleware
  * @param validator Функция принимает на вход входящие данные и проверяет, чтобы они были массивом и каждый элемент в массиве удовлетворял заданной функции проверки.
- *                  Если даные не соответствуют заданному критерию, то будет сгенерировано исключение. 
- * @param func 
+ *                  Если даные не соответствуют заданному критерию, то будет сгенерировано исключение.
+ * @param func
  */
 const appPost = (
   endPoint: string,
@@ -187,8 +187,8 @@ const appPost = (
         res.status(500).send({success: false, error: { code: 500, message: `Ошибка Firebird: ${err}`}});
       }
     } catch(err) {
-      log.error(`${endPoint} Неверный формат данных`);
-      res.status(500).send({success: false, error: { code: 500, message: 'Неверный формат данных'}});
+      log.error(`${endPoint} Неверный формат данных ${err}`);
+      res.status(500).send({success: false, error: { code: 500, message: `${endPoint} Неверный формат данных ${err}`}});
     }
   });
 };
@@ -198,11 +198,11 @@ const makeDataValidator = (itemValidator: any) => (reqBodyObj: any) => {
     throw new Error('Входящие данные должны быть не пустым массивом');
   }
 
-  for (const rec of reqBodyObj) {    
+  for (const rec of reqBodyObj) {
     if (!itemValidator(rec)) {
       throw new Error(`Неверный формат данных ${JSON.stringify(rec)}`);
     }
-  }       
+  }
 };
 
 appPost("/values", requireAuth, makeDataValidator(isValueData), loadValue);
