@@ -64,6 +64,7 @@ const attach = () =>
 
 const app = express();
 const PORT = 8000;
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
@@ -71,10 +72,17 @@ app.use(async (req: any, res: Response, next: NextFunction) => {
   // Получение значения из header
   const authToken = req.headers['authorization'];
   // Поиск пользователя из db по токену
-  const item = await findOne(db, { authToken });
-  // Сохраняем объект пользователя в свойство user,
-  // чтобы в следующих запросах разрешить доступ этому пользователю
-  req.user = item?.user;
+  if (authToken) {
+    try {
+      //Зависал сервер из-за файла users. Удаления файла помогло
+      const item = await findOne(db, { authToken });
+      // Сохраняем объект пользователя в свойство user,
+      // чтобы в следующих запросах разрешить доступ этому пользователю
+      req.user = item?.user;
+    } catch (err: any) {
+      log.error('Ошибка поиска пользователя по токену в файле users!');
+    }
+  }
   next();
 });
 
@@ -124,9 +132,13 @@ app.post("/login", async (req, res) => {
     //Сгенерируем новый токен
     const authToken = generateAuthToken();
     //Сохраним новый токен в bd для вошедшего пользователя
-    await insert(db, { authToken, user });
-    log.info('/login: Аутентификация успешно пройдена');
-    res.status(200).send({success: true, data: { access_token: authToken }});
+    try {
+      await insert(db, { authToken, user });
+      log.info('/login: Аутентификация успешно пройдена');
+      res.status(200).send({success: true, data: { access_token: authToken }});
+    } catch (err: any) {
+      log.error('/login: Аутентификация не пройдена. Ошибка записи в файл users');
+    }
   } else {
     log.warn('/login: Неверный пароль');
     res.status(401).send({success: false, error: { code: 401, message: "Неверный пароль"}});
@@ -136,11 +148,15 @@ app.post("/login", async (req, res) => {
 app.post("/logout", requireAuth, async (req, res) => {
   const authToken = req.headers['authorization'];
   //Удаляем из db запись с текущем пользователем
-  await remove(db, { authToken });
-  // //Удаляем токен из Header
-  // delete req.headers['Authorization'];
-  log.info('/logout: Выход из учетной записи выполнен успешно');
-  res.status(200).send({success: true});
+  try {
+    await remove(db, { authToken });
+    // //Удаляем токен из Header
+    // delete req.headers['Authorization'];
+    log.info('/logout: Выход из учетной записи выполнен успешно');
+    res.status(200).send({success: true});
+  } catch (err: any) {
+    log.error('/logout: Выход из учетной записи не выполнен. Ошибка удаления в файле users');
+  }
 });
 
 /**
@@ -197,8 +213,8 @@ const makeDataValidator = (itemValidator: any) => (reqBodyObj: any) => {
   if (!Array.isArray(reqBodyObj) || !reqBodyObj.length) {
     throw new Error('Входящие данные должны быть не пустым массивом');
   }
-
   for (const rec of reqBodyObj) {
+    // console.log('rec', JSON.stringify(rec));
     if (!itemValidator(rec)) {
       throw new Error(`Неверный формат данных ${JSON.stringify(rec)}`);
     }
@@ -233,6 +249,11 @@ appPost("/claims", requireAuth, makeDataValidator(isClaimData), loadClaim);
 
 
 appPost("/remains", requireAuth, makeDataValidator(isRemainsData), loadRemains);
+
+
+app.get("/test", async (req, res) => {
+  return res.status(200).send('I\'m working...');
+});
 
 
 app.listen(PORT, () => {

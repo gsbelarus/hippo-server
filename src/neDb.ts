@@ -20,7 +20,7 @@ export const insert = (db: Datastore<any>, item: any): Promise<any> => {
   return new Promise((resolve, reject) => {
     db.insert(item, (err: any) => {
       if (err) {
-        if (err.errorType == "uniqueViolated") {
+        if (err?.errorType === "uniqueViolated") {
           db.update({_id: item._id}, item, {}, err1 => {
               rejectOrResolve(reject, err1, resolve, "replace");
           });
