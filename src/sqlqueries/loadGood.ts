@@ -6,6 +6,7 @@ const eb = `/* товары */
   EXECUTE BLOCK (
       CODE VARCHAR(50) = ?
     , RATE DINTEGER = ? 
+    , NAMELABEL VARCHAR(255) = ?
     , NAME VARCHAR(255) = ? 
     , WEIGHT DOUBLE PRECISION = ?
     , DISABLED DINTEGER = ?
@@ -50,14 +51,14 @@ const eb = `/* товары */
     IF (ID IS NULL) THEN
     BEGIN
       INSERT INTO GD_GOOD (USR$LSF_CODE, NAME, USR$FULLNAME, GROUPKEY, VALUEKEY, BARCODE, USR$INV_WEIGHT, USR$MOQ, DISABLED, DESCRIPTION) 
-        VALUES (:CODE, LEFT(:NAME, 60), LEFT(:NAME, 180), :PARENT, :VALUEID, :BARCODE, CAST(:WEIGHT AS DECIMAL(15,4)), CAST(:MOQ AS DECIMAL(15,4)), :DISABLED, :DESCR) RETURNING ID INTO :ID;
+        VALUES (:CODE, LEFT(:nameLabel, 60), LEFT(:NAME, 180), :PARENT, :VALUEID, :BARCODE, CAST(:WEIGHT AS DECIMAL(15,4)), CAST(:MOQ AS DECIMAL(15,4)), :DISABLED, :DESCR) RETURNING ID INTO :ID;
       INSERT INTO gd_goodtax (GOODKEY, TAXKEY, DATETAX, RATE) 
         VALUES (:ID, :TAXKEY, CAST('NOW' as date), :RATE);
     END
     ELSE
     BEGIN
       UPDATE GD_GOOD SET 
-        NAME = LEFT(:NAME, 60), 
+        NAME = LEFT(:nameLabel, 60), 
         USR$FULLNAME = LEFT(:NAME, 180), 
         GROUPKEY = :PARENT, 
         VALUEKEY = :VALUEID, 
@@ -78,9 +79,9 @@ export const loadGood = async (data: Good[], attachment: Attachment, transaction
   const st = await attachment.prepare(transaction, eb);
   for (const rec of data) {
     const n = convertingToASCII(rec.name);
-    console.log("name", n);
-    console.log("good", rec);
-    await st.execute(transaction, [rec.code, rec.rate, n, rec.weight,
+    // console.log("name", n);
+    // console.log("good", rec);
+    await st.execute(transaction, [rec.code, rec.rate, rec.nameLabel, n, rec.weight,
       rec.disabled, rec.barcode, rec.valuecode, rec.groupcode, rec.moq]);
   }
 };
@@ -93,6 +94,8 @@ export const isGoodData = (obj: any): obj is Good =>
   typeof obj.groupcode === "string" &&
   obj.groupcode &&
   typeof obj.valuecode === "string" &&
-  obj.valuecode;
+  obj.valuecode  &&
+  typeof obj.nameLabel === "string" &&
+  obj.nameLabel;
 
   

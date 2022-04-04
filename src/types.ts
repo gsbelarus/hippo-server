@@ -29,6 +29,7 @@ export interface Goodgroup {
 export interface Good {
   code: string;
   name: string;
+  nameLabel: string; 
   valuecode: string;
   groupcode: string;
   disabled?: number;

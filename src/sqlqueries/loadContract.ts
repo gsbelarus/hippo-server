@@ -44,7 +44,7 @@ export const loadContract = async (data: Contract[], attachment: Attachment, tra
   const st = await attachment.prepare(transaction, eb);
   for (const rec of data) {
    
-    console.log("contract", rec);
+    // console.log("contract", rec);
     const DB = str2date(rec.datebegin);//rec.datebegin ? new Date (rec.datebegin) : new Date();
     const DE = rec.dateend ? str2date(rec.dateend) : null;
 

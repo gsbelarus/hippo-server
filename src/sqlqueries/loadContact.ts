@@ -39,10 +39,8 @@ const eb = ` EXECUTE BLOCK (CODE VARCHAR(50) = ?, NAME VARCHAR(200) = ?, ADDRESS
   END`;
 
   export const loadContact = async (data: Contact[], attachment: Attachment, transaction: Transaction) => {
-    console.log('loadContact', 111);
     const st = await attachment.prepare(transaction, eb);
     for (const rec of data) {
-      console.log("contact", rec);
       await st.execute(transaction, [rec.code, convertingToASCII(rec.name), convertingToASCII(rec.address), convertingToASCII(rec.phone), convertingToASCII(rec.email), rec.gln, rec.taxid]);
     }
   };
