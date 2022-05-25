@@ -5,7 +5,10 @@
   "scripts": {
     "tsc": "tsc",
     "start": "nodemon src/app.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start:js": "nodemon ./dist/src/app.js",
+    "build": "yarn clean-dist && tsc",
+    "clean-dist": "rimraf ./dist",
+    "nodemon:start": "yarn build && nodemon ./dist/src/app.js --watch"
   },
   "author": "",
   "license": "ISC",
