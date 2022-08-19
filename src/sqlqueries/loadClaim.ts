@@ -2,7 +2,7 @@ import { Attachment, Transaction } from "node-firebird-driver";
 import { Claim } from "../types";
 import { str2date } from "../utils/helpers";
 
-const eb = ` 
+const eb = `
 /* Заказы на поставку ГП */
 EXECUTE BLOCK (NUMBER VARCHAR(50) = ?, DOCDATE DATE = ?, ORDERDATE DATE = ?, STRNUMBER INTEGER = ?, GOODCODE VARCHAR(50) = ?, QUANTITY DOUBLE PRECISION = ?)
 AS
@@ -17,12 +17,11 @@ END
 `;
 
 export const loadClaim = async (data: Claim[], attachment: Attachment, transaction: Transaction) => {
- 
+
 const st = await attachment.prepare(transaction, eb);
   for (const rec of data) {
-    console.log(rec);
-    await st.execute(transaction, 
-      [rec.number, str2date(rec.docdate), 
+    await st.execute(transaction,
+      [rec.number, str2date(rec.docdate),
         str2date(rec.orderdate), rec.stringnumber, rec.goodcode, rec.quant]);
   }
 };

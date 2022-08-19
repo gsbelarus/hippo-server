@@ -1,13 +1,13 @@
 {
   "name": "gippo-connection",
   "version": "1.0.0",
-  "main": "index.js",
   "scripts": {
     "tsc": "tsc",
     "start": "nodemon src/app.ts",
-    "start:js": "nodemon ./dist/src/app.js",
-    "build": "yarn clean-dist && tsc",
-    "clean-dist": "rimraf ./dist",
+    "start:js": "nodemon ./dist/src/app.js",    
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "clean-dist": "rimraf ./dist",    
+    "build": "yarn clean-dist && tsc",    
     "nodemon:start": "yarn build && nodemon ./dist/src/app.js --watch"
   },
   "author": "",

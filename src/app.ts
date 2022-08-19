@@ -214,7 +214,6 @@ const makeDataValidator = (itemValidator: any) => (reqBodyObj: any) => {
     throw new Error('Входящие данные должны быть не пустым массивом');
   }
   for (const rec of reqBodyObj) {
-    // console.log('rec', JSON.stringify(rec));
     if (!itemValidator(rec)) {
       throw new Error(`Неверный формат данных ${JSON.stringify(rec)}`);
     }
