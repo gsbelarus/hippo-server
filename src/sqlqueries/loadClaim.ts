@@ -18,11 +18,17 @@ END
 
 export const loadClaim = async (data: Claim[], attachment: Attachment, transaction: Transaction) => {
 
-const st = await attachment.prepare(transaction, eb);
+  for (const rec of data) {
+    if (rec.quant && typeof rec.quant !== 'number') {
+      throw new Error(`Неверный формат данных ${JSON.stringify(rec)}. Тип свойства quant должен быть числовым!`);
+    }
+  }
+
+  const st = await attachment.prepare(transaction, eb);
   for (const rec of data) {
     await st.execute(transaction,
       [rec.number, str2date(rec.docdate),
-        str2date(rec.orderdate), rec.stringnumber, rec.goodcode, rec.quant]);
+      str2date(rec.orderdate), rec.stringnumber, rec.goodcode, rec.quant || 0]);
   }
 };
 
@@ -37,7 +43,5 @@ export const isClaimData = (obj: any): obj is Claim =>
   typeof obj.stringnumber === "number" &&
   obj.stringnumber &&
   typeof obj.goodcode === "string" &&
-  obj.goodcode &&
-  typeof obj.quant === "number" &&
-  obj.quant >= 0;
+  obj.goodcode;
 

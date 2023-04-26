@@ -29,11 +29,11 @@ export interface Goodgroup {
 export interface Good {
   code: string;
   name: string;
-  nameLabel: string; 
+  nameLabel: string;
   valuecode: string;
   groupcode: string;
   disabled?: number;
-  rate?: number;  
+  rate?: number;
   moq?: number;
   weight?: number;
   barcode?: string;
@@ -65,7 +65,7 @@ export interface Claim {
   orderdate: string;
   stringnumber: number;
   goodcode: string;
-  quant: number;
+  quant?: number;
 }
 
 export interface Remains {
